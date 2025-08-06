@@ -63,16 +63,6 @@ To use this ZFS-based installer:
 4. Start the installer icon from the desktop/dash, fill in the form in the browser and press the big _Install_ button
 5. Reboot and enjoy your ZFS-based Debian system
 
-## Screencast & Screenshot
-
-Screenshot of the full installer GUI:
-
-![gui screenshot](readme-files/gui.png)
-
-Video of installation of Debian with KDE Plasma (Bookworm version):
-
-[![Watch the video](https://img.youtube.com/vi/sbnKvGMcagI/maxresdefault.jpg)](https://youtu.be/sbnKvGMcagI?si=W9NvZygB8Z7-LCT8&t=92)
-
 ## Details
 
 - GPT disk partitions are created on the designated disk drive: 
@@ -119,6 +109,8 @@ Assuming the IP address of the installed machine is 192.168.1.29 and you can rea
       curl  http://192.168.1.29:5000/download_log
 
 ## Testing
+
+**Note: Testing for this ZFS fork is pending. The instructions below are from the original BTRFS version and may need adjustments.**
 
 If you are testing in a virtual machine, attaching the downloaded image file as a virtual disk, you need to extend it first.
 The image file that you downloaded is shrunk, there is no free space left in the filesystems.
