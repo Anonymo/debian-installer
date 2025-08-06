@@ -50,10 +50,15 @@ To use this ZFS-based installer:
 - Easily rollback to previous boot environments
 - Compatible with systemd-boot
 
+### Encryption Support
+- **Full LUKS encryption support maintained** - ZFS runs on top of LUKS encrypted partition
+- TPM unlock support (if available)
+- Optional: Can disable LUKS if desired
+
 ### Additional Features
 - Automatic ZFS module installation and configuration
 - ZFS-optimized kernel parameters
-- Support for ZFS native encryption (in addition to LUKS)
+- Boot environment snapshots for safe system updates
 
 ## Installation Instructions
 
@@ -68,9 +73,14 @@ To use this ZFS-based installer:
 - GPT disk partitions are created on the designated disk drive: 
   - UEFI ESP partition
   - Root partition - [LUKS](https://cryptsetup-team.pages.debian.net/cryptsetup/README.Debian.html) encrypted (rest of the drive)
+- ZFS pool is created on the LUKS encrypted device (layered encryption: LUKS → ZFS)
 - GPT root partition is [auto-discoverable](https://www.freedesktop.org/software/systemd/man/systemd-gpt-auto-generator.html)
-- ZFS datasets will be created as `rpool/ROOT/debian` for `/`, `rpool/home` for `/home` and `rpool/swap` for swap (zvol)
+- ZFS datasets will be created as:
+  - `rpool/ROOT/debian` for `/` (root filesystem)
+  - `rpool/home` for `/home`
+  - `rpool/swap` for swap (zvol)
 - [zectl](https://github.com/johnramsden/zectl) is installed for boot environment management
+- Boot environments allow easy rollback if system updates cause issues
 - The system is installed using an image from the live iso. This will speed up the installation significantly and allow off-line installation.
 - [Dracut](https://github.com/dracutdevs/dracut/wiki/) is used instead of initramfs-tools
 - [Systemd-boot](https://www.freedesktop.org/wiki/Software/systemd/systemd-boot/) is used instead of grub
@@ -110,7 +120,7 @@ Assuming the IP address of the installed machine is 192.168.1.29 and you can rea
 
 ## Testing
 
-**Note: Testing for this ZFS fork is pending. The instructions below are from the original BTRFS version and may need adjustments.**
+**⚠️ Note: Testing for this ZFS fork is pending. The instructions below are from the original BTRFS version and may need adjustments for ZFS.**
 
 If you are testing in a virtual machine, attaching the downloaded image file as a virtual disk, you need to extend it first.
 The image file that you downloaded is shrunk, there is no free space left in the filesystems.
@@ -124,7 +134,6 @@ To test with [libvirt](https://libvirt.org/), make sure to create the VM with UE
 1. Select the _Customize configuration before install_ option at the end of the new VM dialog
 2. In the VM configuration window, _Overview_ tab, _Hypervisor Details_ section, select _Firmware_: _UEFI_
 
-![virt-manager uefi screenshot](readme-files/virt-manager-uefi.png)
 
 To add a TPM module, you need to install the [swtpm-tools](https://packages.debian.org/trixie/swtpm-tools) package.
 
@@ -152,9 +161,25 @@ Just don't forget to edit the configuration options (especially the `DISK` varia
 
 ### Creating Your Own Installer Image
 
- 1. Insert a blank storage device
- 2. Edit the **DISK** variable at the top of files `make_image_*.sh`
- 3. Execute the `make_image_*.sh` files as root
+ 1. Install required build dependencies:
+    ```bash
+    apt-get install debootstrap zfsutils-linux npm golang
+    ```
+ 2. Build the frontend and backend:
+    ```bash
+    cd frontend && npm install && npm run build && cd ..
+    cd backend && go build -o opinionated-installer && cd ..
+    ```
+ 3. Insert a blank storage device
+ 4. Edit the **DISK** variable at the top of files `make_image_*.sh`
+ 5. Execute the `make_image_*.sh` files as root:
+    ```bash
+    sudo ./make_image_1.sh
+    # Follow prompts, then power off and add 500MB to disk
+    sudo ./make_image_2.sh
+    # Reboot when prompted
+    sudo ./make_image_3.sh
+    ```
 
 In the first stage of image generation, you will get a _tasksel_ prompt where you can select a different set of packages for your image.
 
@@ -163,10 +188,10 @@ In the first stage of image generation, you will get a _tasksel_ prompt where yo
 There are 3 GPT partitions on the installer image:
 
  1. EFI boot partition
- 2. Base Image - ZFS pool with LZ4 compression. 
-    When the live system is running, this is used as a [read-only lower device for overlayfs](https://docs.kernel.org/filesystems/overlayfs.html). 
-    When installing the target system, the installer will copy this to the target system, mount it read-write, resize to expand to the whole partition and continue with the system installation.
- 3. Top Overlay - upper and work device for the overlayfs for the live system. The changes you make while the live system is running are persisted here.
+ 2. Base Image - ZFS pool with LZ4 compression
+    - When the live system is running, this is used as a [read-only lower device for overlayfs](https://docs.kernel.org/filesystems/overlayfs.html)
+    - When installing the target system, the installer will copy this to the target system, mount it read-write, and continue with the system installation
+ 3. Top Overlay - ZFS pool for the upper and work device for the overlayfs for the live system. The changes you make while the live system is running are persisted here
 
 ### Building the Front-End
 
@@ -217,7 +242,7 @@ The following table contains comparison of features between our opinionated debi
 | Installer internationalization                      | N     | Y                                                | Y                                                                            |
 | Mirror selection, HTTP proxy support                | N     | Y                                                | N                                                                            |
 | Manual disk partitioning, LVM, filesystem selection | N[4]  | Y                                                | Y                                                                            |
-| ZFS datasets with boot environments                 | Y[2]  | N                                                | N                                                                            |
+| ZFS datasets with boot environments                 | **Y**[2] | N                                                | N                                                                            |
 | Full drive encryption                               | **Y** | Y[1]                                             | Y                                                                            |
 | Passwordless unlock (TPM)                           | **Y** | N                                                | N                                                                            |
 | Image-based installation                            | **Y** | N                                                | N                                                                            |
