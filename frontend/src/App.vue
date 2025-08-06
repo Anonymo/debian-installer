@@ -272,7 +272,7 @@ export default {
     <ul>
       <li>Backports and non-free enabled</li>
       <li>Firmware installed</li>
-      <li>Installed on btrfs subvolumes</li>
+      <li>Installed on ZFS datasets with boot environment management via zectl</li>
       <li>Full disk encryption, unlocked by TPM (if available)</li>
       <li>Fast installation using an image</li>
       <li>Browser-based installer</li>

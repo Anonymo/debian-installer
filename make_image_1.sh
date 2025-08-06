@@ -15,7 +15,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 notify install required packages
 apt-get update -y
-DEBIAN_FRONTEND=noninteractive apt-get install -y debootstrap uuid-runtime btrfs-progs dosfstools
+DEBIAN_FRONTEND=noninteractive apt-get install -y debootstrap uuid-runtime zfsutils-linux zfs-dkms dosfstools
 
 if [ ! -f efi-part.uuid ]; then
     echo generate uuid for efi partition
@@ -51,38 +51,46 @@ echo ", +" | sfdisk -N 2 $DISK
 sfdisk -d $DISK > partitions_created.txt
 fi
 
-if [ ! -f btrfs_created.txt ]; then
-    notify create root filesystem on ${root_device}
-    mkfs.btrfs -f ${root_device} | tee btrfs_created.txt
+if [ ! -f zfs_created.txt ]; then
+    notify create ZFS pool on ${root_device}
+    zpool create -f -o ashift=12 -O compression=lz4 -O acltype=posixacl -O xattr=sa \
+        -O normalization=formD -O mountpoint=none -O canmount=off -O dnodesize=auto \
+        -O relatime=on rpool ${root_device} || exit 1
+    touch zfs_created.txt
 fi
 if [ ! -f vfat_created.txt ]; then
     notify create esp filesystem on ${DISK}1
     mkfs.vfat ${DISK}1 | tee vfat_created.txt
 fi
 
-if mountpoint -q "/mnt/btrfs1" ; then
-    echo top-level subvolume already mounted on /mnt/btrfs1
+if zpool list rpool > /dev/null 2>&1; then
+    echo ZFS pool rpool already imported
 else
-    notify mount top-level subvolume on /mnt/btrfs1
-    mkdir -p /mnt/btrfs1
-    mount ${root_device} /mnt/btrfs1 -o ${FSFLAGS},subvolid=5
+    notify import ZFS pool rpool
+    zpool import -f rpool || exit 1
 fi
 
-if [ ! -e /mnt/btrfs1/@ ]; then
-    notify create @, @swap and @home subvolumes on /mnt/btrfs1
-    btrfs subvolume create /mnt/btrfs1/@
-    btrfs subvolume create /mnt/btrfs1/@home
-    btrfs subvolume create /mnt/btrfs1/@swap
+if ! zfs list rpool/ROOT > /dev/null 2>&1; then
+    notify create ZFS datasets
+    zfs create -o mountpoint=none rpool/ROOT || exit 1
+    zfs create -o mountpoint=/ rpool/ROOT/debian || exit 1
+    zfs create -o mountpoint=/home rpool/home || exit 1
+    zfs create -V 2G -b $(getconf PAGESIZE) \
+        -o compression=zle -o logbias=throughput -o sync=always \
+        -o primarycache=metadata -o secondarycache=none \
+        -o com.sun:auto-snapshot=false rpool/swap || exit 1
 fi
 
 if mountpoint -q "${target}" ; then
-    echo root subvolume already mounted on ${target}
+    echo ZFS datasets already mounted on ${target}
 else
-    notify mount root and home subvolume on ${target}
+    notify mount ZFS datasets on ${target}
     mkdir -p ${target}
-    mount ${root_device} ${target} -o ${FSFLAGS},subvol=@
+    zfs set mountpoint=${target} rpool/ROOT/debian || exit 1
+    zfs mount rpool/ROOT/debian || exit 1
     mkdir -p ${target}/home
-    mount ${root_device} ${target}/home -o ${FSFLAGS},subvol=@home
+    zfs set mountpoint=${target}/home rpool/home || exit 1
+    zfs mount rpool/home || exit 1
 fi
 
 mkdir -p ${target}/var/cache/apt/archives
@@ -145,7 +153,7 @@ chroot ${target}/ dpkg --add-architecture i386
 
 notify install required packages on ${target}
 cat <<EOF > ${target}/tmp/packages.txt
-btrfsmaintenance
+zfs-auto-snapshot
 locales
 adduser
 passwd
@@ -163,7 +171,9 @@ cat <<EOF > ${target}/tmp/packages_backports.txt
 systemd
 systemd-cryptsetup
 systemd-timesyncd
-btrfs-progs
+zfsutils-linux
+zfs-initramfs
+zfs-dkms
 dosfstools
 firmware-linux
 atmel-firmware
@@ -236,14 +246,15 @@ rm -f ${target}/etc/crypttab
 rm -f ${target}/var/log/*log
 rm -f ${target}/var/log/apt/*log
 
-# shrink_btrfs_filesystem ${target}  # XXX ERROR: error during balancing '/target': No space left on device
+# optimize_zfs_pool rpool
 
 echo "Disk usage on ${target}"
 df -h ${target}
-btrfs fi df ${target}
+zpool list rpool
+zfs list -r rpool
 
 notify umounting all filesystems
-umount -R ${target}
-umount -R /mnt/btrfs1
+zfs unmount -a
+zpool export rpool
 
 echo "NOW POWER OFF, ADD 500MB AND CONTINUE WITH PART 2"

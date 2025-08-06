@@ -41,7 +41,10 @@ fi
 
 if [ ! -f fs_top_created.txt ]; then
     notify create overlay top filesystem on ${overlay_top_device}
-    mkfs.btrfs -f -d single -m single --mixed ${overlay_top_device}
+    zpool create -f -o ashift=12 -O compression=lz4 -O acltype=posixacl -O xattr=sa \
+        -O normalization=formD -O mountpoint=none -O canmount=off -O dnodesize=auto \
+        -O relatime=on overlay_pool ${overlay_top_device} || exit 1
+    zfs create -o mountpoint=/mnt/overlay_top overlay_pool/overlay || exit 1
     touch fs_top_created.txt
 fi
 
@@ -50,7 +53,9 @@ if mountpoint -q "${overlay_low_mount}" ; then
 else
     notify mount base image read only on ${overlay_low_mount}
     mkdir -p ${overlay_low_mount}
-    mount ${root_device} ${overlay_low_mount} -o ${FSFLAGS},ro,subvol=@
+    zpool import -f rpool || exit 1
+    zfs set mountpoint=${overlay_low_mount} rpool/ROOT/debian || exit 1
+    mount -t zfs -o ro rpool/ROOT/debian ${overlay_low_mount}
 fi
 
 if mountpoint -q "${overlay_top_mount}" ; then
@@ -58,7 +63,8 @@ if mountpoint -q "${overlay_top_mount}" ; then
 else
     notify mount overlay top on ${overlay_top_mount}
     mkdir -p ${overlay_top_mount}
-    mount ${overlay_top_device} ${overlay_top_mount} -o ${FSFLAGS}
+    zpool import -f overlay_pool || exit 1
+    zfs mount overlay_pool/overlay
     mkdir -p ${overlay_top_mount}/upper
     mkdir -p ${overlay_top_mount}/work
 fi
@@ -99,8 +105,8 @@ fi
 
 notify setup fstab
 cat <<EOF > ${target}/etc/fstab
-PARTUUID=${base_image_uuid} ${overlay_low_mount} btrfs defaults,ro,subvol=@ 0 1
-PARTUUID=${top_uuid} ${overlay_top_mount} btrfs defaults 0 1
+# ZFS datasets are managed by ZFS, not fstab
+# overlay_pool/overlay ${overlay_top_mount} zfs defaults 0 0
 PARTUUID=${efi_uuid} /boot/efi vfat defaults,umask=077 0 2
 EOF
 
@@ -254,7 +260,7 @@ sync
 umount -R ${target}
 umount -R ${overlay_low_mount}
 
-shrink_btrfs_filesystem ${overlay_top_mount}
+optimize_zfs_pool overlay_pool
 notify umounting the overlay top
 umount -R ${overlay_top_mount}
 

@@ -6,7 +6,7 @@ Our opinions of what a modern installation of Debian should look like in 2025 ar
  - Debian 13 (Trixie)
  - Backports and non-free enabled
  - Firmware installed
- - Installed on btrfs subvolumes
+ - Installed on ZFS datasets with boot environment management via zectl
  - Full disk encryption, unlocked by TPM
  - Fast installation using an image
  - Browser-based installer

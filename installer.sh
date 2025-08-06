@@ -55,7 +55,7 @@ fi
 if [ -z "${NON_INTERACTIVE}" ]; then
     notify install required packages
     apt-get update -y  || exit 1
-    apt-get install -y cryptsetup debootstrap uuid-runtime btrfs-progs dosfstools || exit 1
+    apt-get install -y cryptsetup debootstrap uuid-runtime zfsutils-linux dosfstools || exit 1
 fi
 
 KEYFILE=luks.key
@@ -68,9 +68,9 @@ if [ ! -f main-part.uuid ]; then
     uuidgen > main-part.uuid || exit 1
 fi
 
-if [ ! -f btrfs.uuid ]; then
-    notify generate uuid for btrfs filesystem
-    uuidgen > btrfs.uuid || exit 1
+if [ ! -f zpool.name ]; then
+    notify generate zpool name
+    echo "rpool" > zpool.name || exit 1
 fi
 
 root_part_type="4f68bce3-e8cd-4db1-96e7-fbcaf984b709"  # X86_64
@@ -80,10 +80,10 @@ efi_part_uuid=$(cat efi-part.uuid)
 main_part_uuid=$(cat main-part.uuid)
 efi_partition=/dev/disk/by-partuuid/${efi_part_uuid}
 main_partition=/dev/disk/by-partuuid/${main_part_uuid}
-btrfs_uuid=$(cat btrfs.uuid)
+zpool_name=$(cat zpool.name)
 top_level_mount=/mnt/top_level_mount
 target=/target
-kernel_params="rw quiet rootfstype=btrfs rootflags=${FSFLAGS},subvol=@ rd.auto=1 splash"
+kernel_params="rw quiet root=ZFS=${zpool_name}/ROOT/debian rd.auto=1 splash"
 if [ "${DISABLE_LUKS}" != "true" ]; then
   kernel_params="rd.luks.options=tpm2-device=auto ${kernel_params}"
   luks_device_name=root
@@ -162,17 +162,19 @@ if [ -e /dev/disk/by-partlabel/BaseImage ]; then
         notify copy base image to ${root_device}
         wipefs -a ${root_device} || exit 1
         dd if=/dev/disk/by-partlabel/BaseImage of=${root_device} bs=256M oflag=dsync status=progress || exit 1
-        notify check the filesystem on root
-        btrfs check ${root_device} || exit 1
-        notify change the filesystem uuid on root
-        btrfstune -U ${btrfs_uuid} -f ${root_device} || exit 1  # change the uuid
+        notify import and configure zpool
+        zpool import -f -d ${root_device} ${zpool_name} || exit 1
+        zpool export ${zpool_name} || exit 1
         touch base_image_copied.txt
     fi
 else
-    if [ ! -f btrfs_created.txt ]; then
-        notify create root filesystem on ${root_device}
+    if [ ! -f zfs_created.txt ]; then
+        notify create ZFS pool on ${root_device}
         wipefs -a ${root_device} || exit 1
-        mkfs.btrfs -U ${btrfs_uuid} ${root_device} | tee btrfs_created.txt || exit 1
+        zpool create -f -o ashift=12 -O compression=lz4 -O acltype=posixacl -O xattr=sa \
+            -O normalization=formD -O mountpoint=none -O canmount=off -O dnodesize=auto \
+            -O relatime=on ${zpool_name} ${root_device} || exit 1
+        touch zfs_created.txt
     fi
 fi
 
@@ -183,52 +185,46 @@ if [ ! -f vfat_created.txt ]; then
     touch vfat_created.txt
 fi
 
-if mountpoint -q "${top_level_mount}" ; then
-    echo top-level subvolume already mounted on ${top_level_mount}
+if zpool list ${zpool_name} > /dev/null 2>&1; then
+    echo ZFS pool ${zpool_name} already imported
 else
-    notify mount top-level subvolume on ${top_level_mount} and resize to fit the whole partition
-    mkdir -p ${top_level_mount} || exit 1
-    mount ${root_device} ${top_level_mount} -o rw,${FSFLAGS},subvolid=5,skip_balance || exit 1
-    btrfs filesystem resize max ${top_level_mount} || exit 1
+    notify import ZFS pool ${zpool_name}
+    zpool import -f ${zpool_name} || exit 1
 fi
 
-if [ ! -e ${top_level_mount}/@ ]; then
-    notify create @ and @home subvolumes on ${top_level_mount}
-    btrfs subvolume create ${top_level_mount}/@ || exit 1
-    btrfs subvolume create ${top_level_mount}/@home || exit 1
+if ! zfs list ${zpool_name}/ROOT > /dev/null 2>&1; then
+    notify create ZFS datasets
+    zfs create -o mountpoint=none ${zpool_name}/ROOT || exit 1
+    zfs create -o mountpoint=/ ${zpool_name}/ROOT/debian || exit 1
+    zfs create -o mountpoint=/home ${zpool_name}/home || exit 1
     if [ ${SWAP_SIZE} -gt 0 ]; then
-        notify create @swap subvolume for swap file on ${top_level_mount}
-        btrfs subvolume create ${top_level_mount}/@swap || exit 1
-        chmod 700 ${top_level_mount}/@swap || exit 1
+        notify create swap zvol
+        zfs create -V ${SWAP_SIZE}G -b $(getconf PAGESIZE) \
+            -o compression=zle -o logbias=throughput -o sync=always \
+            -o primarycache=metadata -o secondarycache=none \
+            -o com.sun:auto-snapshot=false ${zpool_name}/swap || exit 1
     fi
 fi
 
 if mountpoint -q "${target}" ; then
-    echo root subvolume already mounted on ${target}
+    echo ZFS datasets already mounted on ${target}
 else
-    notify mount root and home subvolume on ${target}
+    notify mount ZFS datasets on ${target}
     mkdir -p ${target} || exit 1
-    mount ${root_device} ${target} -o ${FSFLAGS},subvol=@ || exit 1
+    zfs set mountpoint=${target} ${zpool_name}/ROOT/debian || exit 1
+    zfs mount ${zpool_name}/ROOT/debian || exit 1
     mkdir -p ${target}/home || exit 1
-    mount ${root_device} ${target}/home -o ${FSFLAGS},subvol=@home || exit 1
-    if [ ${SWAP_SIZE} -gt 0 ]; then
-        notify mount swap subvolume on ${target}
-        mkdir -p ${target}/swap || exit 1
-        mount ${root_device} ${target}/swap -o noatime,subvol=@swap || exit 1
-    fi
+    zfs set mountpoint=${target}/home ${zpool_name}/home || exit 1
+    zfs mount ${zpool_name}/home || exit 1
 fi
 
 if [ ${SWAP_SIZE} -gt 0 ]; then
-    if [ ! -e ${target}/swap/swapfile ]; then
-      notify make swap file at ${target}/swap/swapfile
-      btrfs filesystem mkswapfile --size ${SWAP_SIZE}G ${target}/swap/swapfile || exit 1
+    if ! grep -qs "/dev/zvol/${zpool_name}/swap" /proc/swaps ; then
+      notify configure and enable swap zvol
+      mkswap -f /dev/zvol/${zpool_name}/swap || exit 1
+      swapon /dev/zvol/${zpool_name}/swap || exit 1
     fi
-    if ! grep -qs "${target}/swap/swapfile" /proc/swaps ; then
-      notify enable swap file ${target}/swap/swapfile
-      swapon ${target}/swap/swapfile || exit 1
-    fi
-    swapfile_offset=$(btrfs inspect-internal map-swapfile -r ${target}/swap/swapfile)
-    kernel_params="${kernel_params} resume=${root_device} resume_offset=${swapfile_offset}"
+    kernel_params="${kernel_params} resume=/dev/zvol/${zpool_name}/swap"
 fi
 
 if [ ! -f ${target}/etc/debian_version ]; then
@@ -266,18 +262,14 @@ rm -f ${target}/etc/localtime
 (cd ${target} && ln -s /usr/share/zoneinfo/${TIMEZONE} etc/localtime)
 
 notify setup fstab
-mkdir -p ${target}/root/btrfs1 || exit 1
 cat <<EOF > ${target}/etc/fstab || exit 1
-UUID=${btrfs_uuid} / btrfs defaults,subvol=@,${FSFLAGS} 0 1
-UUID=${btrfs_uuid} /home btrfs defaults,subvol=@home,${FSFLAGS} 0 1
-UUID=${btrfs_uuid} /root/btrfs1 btrfs defaults,subvolid=5,${FSFLAGS} 0 1
+# ZFS datasets are managed by ZFS, not fstab
 PARTUUID=${efi_part_uuid} /boot/efi vfat defaults,umask=077 0 2
 EOF
 
 if [ ${SWAP_SIZE} -gt 0 ]; then
 cat <<EOF >> ${target}/etc/fstab || exit 1
-UUID=${btrfs_uuid} /swap btrfs defaults,subvol=@swap,noatime 0 0
-/swap/swapfile none swap defaults 0 0
+/dev/zvol/${zpool_name}/swap none swap defaults 0 0
 EOF
 fi
 
@@ -358,7 +350,7 @@ fi
 notify configuring dracut and kernel command line
 mkdir -p ${target}/etc/dracut.conf.d
 cat <<EOF > ${target}/etc/dracut.conf.d/90-luks.conf || exit 1
-add_dracutmodules+=" systemd crypt btrfs tpm2-tss "
+add_dracutmodules+=" systemd crypt zfs tpm2-tss "
 kernel_cmdline="${kernel_params}"
 EOF
 cat <<EOF > ${target}/etc/kernel/cmdline || exit 1
@@ -372,9 +364,19 @@ fi
 cat <<EOF > ${target}/tmp/run1.sh || exit 1
 #!/bin/bash
 export DEBIAN_FRONTEND=noninteractive
-apt-get install -y locales  tasksel network-manager sudo || exit 1
-apt-get install -y -t ${BACKPORTS_VERSION} systemd systemd-boot dracut btrfs-progs cryptsetup tpm2-tools tpm-udev || exit 1
+apt-get install -y locales  tasksel network-manager sudo git python3 python3-pip || exit 1
+apt-get install -y -t ${BACKPORTS_VERSION} systemd systemd-boot dracut zfsutils-linux zfs-initramfs cryptsetup tpm2-tools tpm-udev || exit 1
 bootctl install || exit 1
+
+# Install zectl for boot environment management
+git clone https://github.com/johnramsden/zectl /tmp/zectl || exit 1
+cd /tmp/zectl || exit 1
+pip3 install --break-system-packages . || exit 1
+cd / || exit 1
+rm -rf /tmp/zectl || exit 1
+
+# Configure zectl
+zectl set bootloader=systemdboot || exit 1
 EOF
 chroot ${target}/ sh /tmp/run1.sh || exit 1
 
@@ -398,7 +400,7 @@ fi
 
 notify install kernel and firmware on ${target}
 cat <<EOF > ${target}/tmp/packages.txt || exit 1
-btrfsmaintenance
+zfs-auto-snapshot
 locales
 adduser
 passwd
@@ -417,7 +419,9 @@ linux-image-amd64
 systemd
 systemd-cryptsetup
 systemd-timesyncd
-btrfs-progs
+zfsutils-linux
+zfs-initramfs
+zfs-dkms
 dosfstools
 dracut
 firmware-linux
@@ -512,10 +516,10 @@ chroot ${target}/ apt-get autoremove -y
 
 notify umounting all filesystems
 if [ ${SWAP_SIZE} -gt 0 ]; then
-    swapoff ${target}/swap/swapfile
+    swapoff /dev/zvol/${zpool_name}/swap
 fi
-umount -R ${target}
-umount -R ${top_level_mount}
+zfs unmount -a
+zpool export ${zpool_name}
 
 if [ "${DISABLE_LUKS}" != "true" ]; then
   notify closing luks

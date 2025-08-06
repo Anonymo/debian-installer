@@ -3,26 +3,18 @@ function notify {
   read -p "Enter to continue"
 }
 
-function shrink_btrfs_filesystem {
-  local filesystem=$1
-  notify balancing and shrinking the filesystem ${filesystem}
-  btrfs balance start -dusage=90 -musage=90 ${filesystem} || exit 1
-  true
-  while [ $? -eq 0 ]; do
-      btrfs filesystem resize -1G ${filesystem}
+function optimize_zfs_pool {
+  local pool_name=$1
+  notify optimizing ZFS pool ${pool_name}
+  zpool scrub ${pool_name} || exit 1
+  # Wait for scrub to complete
+  while zpool status ${pool_name} | grep -q "scrub in progress"; do
+    sleep 5
   done
-  true
-  while [ $? -eq 0 ]; do
-      btrfs filesystem resize -100M ${filesystem}
-  done
-  true
-  while [ $? -eq 0 ]; do
-      btrfs filesystem resize -10M ${filesystem}
-  done
-
-  btrfs filesystem usage -m ${filesystem} |grep slack | cut -f 3 | tr -d '[:space:]' > device_slack.txt
-  local DEVICE_SLACK=$(cat device_slack.txt)
-  echo device slack is ${DEVICE_SLACK}
+  # ZFS doesn't support dynamic shrinking like btrfs
+  # Pool size is determined by the underlying device
+  zpool list ${pool_name} || exit 1
+  echo ZFS pool optimization complete
 }
 
 function shrink_partition {
@@ -33,7 +25,13 @@ function shrink_partition {
     notify shrinking partition ${disk}${partition_nr} by ${slack}
     echo ", -${slack}" | sfdisk ${disk} -N ${partition_nr}
     notify checking the filesystem after partition shrink
-    btrfs check "${disk}${partition_nr}"  || exit 1
+    zpool import -f -d "${disk}${partition_nr}" -N rpool || exit 1
+    zpool scrub rpool || exit 1
+    # Wait for scrub to complete
+    while zpool status rpool | grep -q "scrub in progress"; do
+      sleep 5
+    done
+    zpool export rpool || exit 1
     touch "partition_${partition_nr}_shrunk.txt"
   fi
 }

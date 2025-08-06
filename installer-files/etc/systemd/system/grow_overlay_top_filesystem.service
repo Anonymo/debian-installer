@@ -7,7 +7,7 @@ After=systemd-repart.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/btrfs filesystem resize max /mnt/overlay_top
+ExecStart=/usr/sbin/zpool set autoexpand=on overlay_pool
 
 [Install]
 WantedBy=multi-user.target
