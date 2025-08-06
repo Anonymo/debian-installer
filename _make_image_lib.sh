@@ -11,8 +11,10 @@ function optimize_zfs_pool {
   while zpool status ${pool_name} | grep -q "scrub in progress"; do
     sleep 5
   done
-  # ZFS doesn't support dynamic shrinking like btrfs
-  # Pool size is determined by the underlying device
+  # ZFS now supports online shrinking with TRIM
+  # Reclaim unused space
+  zpool trim ${pool_name} || exit 1
+  # Rebalance and optimize the pool
   zpool list ${pool_name} || exit 1
   echo ZFS pool optimization complete
 }
