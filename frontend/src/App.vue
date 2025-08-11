@@ -27,8 +27,8 @@ export default {
         USER_FULL_NAME: undefined,
         USER_PASSWORD: undefined,
         ROOT_PASSWORD: undefined,
-        LUKS_PASSWORD: undefined,
-        DISABLE_LUKS: undefined,
+        ENCRYPTION_PASSWORD: undefined,
+        ENABLE_ENCRYPTION: false,
         ENABLE_TPM: undefined,
         HOSTNAME: undefined,
         TIMEZONE: undefined,
@@ -44,22 +44,21 @@ export default {
       if(this.error_message.length>0) {
         ret = false;
       }
-      /*
-      // XXX this is currently broken
+      // Check required fields
       for(const [key, value] of Object.entries(this.installer)) {
-        if(key === "LUKS_PASSWORD" && this.installer.DISABLE_LUKS) {
+        if(key === "ENCRYPTION_PASSWORD" && !this.installer.ENABLE_ENCRYPTION) {
           continue;
         }
-        if(typeof value === 'undefined') {
-          ret = false;
-          break;
+        if(key === "NVIDIA_PACKAGE") {
+          continue; // Optional
         }
-        if(value.length === 0) {
-          ret = false;
-          break;
+        if(typeof value === 'undefined' || value === null || value === "") {
+          if(key !== "SSH_PUBLIC_KEY" && key !== "AFTER_INSTALLED_CMD") {
+            ret = false;
+            break;
+          }
         }
       }
-       */
       return ret;
     },
     hostname() {
@@ -273,7 +272,7 @@ export default {
       <li>Backports and non-free enabled</li>
       <li>Firmware installed</li>
       <li>Installed on ZFS datasets with boot environment management via zectl</li>
-      <li>Full disk encryption, unlocked by TPM (if available)</li>
+      <li>Optional ZFS native encryption (AES-256-GCM)</li>
       <li>Fast installation using an image</li>
       <li>Browser-based installer</li>
     </ul>
@@ -297,15 +296,11 @@ export default {
       </fieldset>
 
       <fieldset>
-        <legend>Disk Encryption</legend>
-        <input type="checkbox" v-model="installer.DISABLE_LUKS" id="DISABLE_LUKS" class="inline">
-        <label for="DISABLE_LUKS" class="inline">Device already encrypted</label>
+        <legend>ZFS Native Encryption</legend>
+        <input type="checkbox" v-model="installer.ENABLE_ENCRYPTION" id="ENABLE_ENCRYPTION" class="inline">
+        <label for="ENABLE_ENCRYPTION" class="inline">Enable ZFS native encryption</label>
 
-        <!-- TODO: skip if DISABLE_LUKS -->
-        <Password v-model="installer.LUKS_PASSWORD" :disabled="running" :is-main="true"/>
-
-        <input type="checkbox" v-model="installer.ENABLE_TPM" id="ENABLE_TPM" class="inline mt-3">
-        <label for="ENABLE_TPM" class="inline mt-3">Unlock disk with TPM</label>
+        <Password v-if="installer.ENABLE_ENCRYPTION" v-model="installer.ENCRYPTION_PASSWORD" :disabled="running" :is-main="true"/>
       </fieldset>
 
       <fieldset>
