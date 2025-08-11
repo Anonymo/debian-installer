@@ -9,7 +9,7 @@ Our opinions of what a modern installation of Debian should look like in 2025 ar
  - Backports and non-free enabled
  - Firmware installed
  - Installed on ZFS datasets with boot environment management via zectl
- - Optional ZFS native encryption or LUKS encryption, TPM unlock support
+ - Optional ZFS native encryption (AES-256-GCM)
  - Fast installation using an image
  - Browser-based installer
   
@@ -59,9 +59,8 @@ Our opinions of what a modern installation of Debian should look like in 2025 ar
 
 ### Encryption Support
 - **ZFS Native Encryption** (NEW) - AES-256-GCM encryption at the dataset level
-- **LUKS Encryption** (Legacy) - Full disk encryption with ZFS on top
-- Both encryption methods are optional
-- TPM unlock support for LUKS (if available)
+- Encryption is completely optional
+- No additional encryption layers needed
 - Password prompt at boot for ZFS native encryption
 
 ### Additional Features
@@ -83,8 +82,8 @@ Our opinions of what a modern installation of Debian should look like in 2025 ar
 
 - GPT disk partitions are created on the designated disk drive: 
   - UEFI ESP partition
-  - Root partition - [LUKS](https://cryptsetup-team.pages.debian.net/cryptsetup/README.Debian.html) encrypted (rest of the drive)
-- ZFS pool is created on the LUKS encrypted device (layered encryption: LUKS → ZFS)
+  - Root partition - ZFS pool with optional native encryption
+- ZFS pool is created directly on the partition
 - GPT root partition is [auto-discoverable](https://www.freedesktop.org/software/systemd/man/systemd-gpt-auto-generator.html)
 - ZFS datasets will be created as:
   - `rpool/ROOT/debian` for `/` (root filesystem)
@@ -122,7 +121,7 @@ Assuming the IP address of the installed machine is 192.168.1.29 and you can rea
 * Use curl - again, see the [installer.ini](installer-files/boot/efi/installer.ini) file for list of all options for the form data in -F parameters:
 
       curl -v -F "DISK=/dev/vda" -F "USER_PASSWORD=hunter2" \
-      -F "ROOT_PASSWORD=changeme" -F "LUKS_PASSWORD=luke" \ 
+      -F "ROOT_PASSWORD=changeme" -F "ENCRYPTION_PASSWORD=secret" \ 
       http://192.168.1.29:5000/install
 
 * Use curl to prompt for logs:
@@ -266,4 +265,4 @@ The following table contains comparison of features between our opinionated debi
 
 [3] `@rootfs`
 
-[4] Fixed partitioning (see Details above), LUKS is automatic, ZFS is used as filesystem
+[4] Fixed partitioning (see Details above), ZFS native encryption is optional

@@ -56,8 +56,8 @@ Key variables to modify (lines 5-18):
 - `USERNAME=user` - Your desired username
 - `USER_PASSWORD=hunter2` - Your user password
 - `ROOT_PASSWORD=changeme` - Root password
-- `DISABLE_LUKS=false` - Set to `true` if you don't want encryption
-- `LUKS_PASSWORD=luke` - Encryption password (if using LUKS)
+- `ENABLE_ENCRYPTION=false` - Set to `true` if you want ZFS native encryption
+- `ENCRYPTION_PASSWORD=` - Encryption password (if using encryption)
 - `HOSTNAME=debian13` - Your system hostname
 - `SWAP_SIZE=2` - Swap size in GB
 
@@ -69,7 +69,7 @@ sudo ./installer.sh
 
 The script will:
 1. Partition your disk (GPT with EFI and root partitions)
-2. Set up LUKS encryption (if enabled)
+2. Set up ZFS native encryption (if enabled)
 3. Create ZFS pool and datasets
 4. Install base Debian system via debootstrap
 5. Configure the system with your settings
@@ -133,7 +133,7 @@ sudo nano installer.sh
 After successful installation:
 1. Remove USB drive
 2. Reboot system
-3. If using LUKS with TPM, it should auto-unlock
+3. If using encryption, enter password at boot
 4. Login with the credentials you configured
 
 Your system will have:

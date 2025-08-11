@@ -47,15 +47,15 @@ func Tui(baseUrlString *string) {
 		AddDropDown("Installation Target Device", deviceNames, getSliceIndex(m.Disk, devices), func(_ string, optionIndex int) {
 			m.Disk = devices[optionIndex]
 		}).
-		AddCheckbox("Disable Encryption", m.DisableLuks == "true", func(checked bool) {
+		AddCheckbox("Enable ZFS Encryption", m.EnableEncryption == "true", func(checked bool) {
 			if checked {
-				m.DisableLuks = "true"
+				m.EnableEncryption = "true"
 			} else {
-				m.DisableLuks = "false"
+				m.EnableEncryption = "false"
 			}
 		}).
-		AddPasswordField("Disk Encryption Passphrase", m.LuksPassword, 0, '*', func(text string) {
-			m.LuksPassword = text
+		AddPasswordField("ZFS Encryption Passphrase", m.EncryptionPassword, 0, '*', func(text string) {
+			m.EncryptionPassword = text
 		}). // TODO second time
 		AddCheckbox("Unlock with TPM", m.EnableTpm == "true", func(checked bool) {
 			if checked {

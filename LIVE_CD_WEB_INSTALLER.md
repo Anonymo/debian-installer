@@ -70,7 +70,7 @@ Your system will have:
   - `zectl create <name>` - create new boot environment
   - `zectl activate <name>` - switch boot environments
 - **ZFS Native Encryption** (optional):
-  - No LUKS layer needed
+  - Direct encryption at the ZFS layer
   - Encryption at the dataset level
   - Password prompt at boot
 - **Automatic APT Snapshots**:
