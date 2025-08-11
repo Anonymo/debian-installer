@@ -9,7 +9,7 @@ Our opinions of what a modern installation of Debian should look like in 2025 ar
  - Backports and non-free enabled
  - Firmware installed
  - Installed on ZFS datasets with boot environment management via zectl
- - Full disk encryption, unlocked by TPM
+ - Optional ZFS native encryption or LUKS encryption, TPM unlock support
  - Fast installation using an image
  - Browser-based installer
   
@@ -19,11 +19,18 @@ Our opinions of what a modern installation of Debian should look like in 2025 ar
  - Amd64 with EFI only
  - The installer is in english only
 
-## Building from Source
+## Installation Methods
 
-**Note: Pre-built images are not yet available for this ZFS fork. You will need to build the installer image yourself.**
+### Method 1: Use Official Debian Live CD (Recommended)
+**No custom ISO build required!** Boot an official Debian Live CD and run the web installer:
 
-To use this ZFS-based installer:
+1. Download [Debian Trixie GNOME Live CD](https://cdimage.debian.org/cdimage/weekly-live-builds/amd64/iso-hybrid/)
+2. Boot the Live CD and follow [LIVE_CD_WEB_INSTALLER.md](LIVE_CD_WEB_INSTALLER.md)
+3. Access the web installer at `http://localhost:5000/opinionated-debian-installer/`
+
+### Method 2: Build Custom Installer Image
+
+**Note: Pre-built images are not yet available for this ZFS fork.**
 
 1. Clone this repository:
    ```bash
@@ -51,14 +58,18 @@ To use this ZFS-based installer:
 - Compatible with systemd-boot
 
 ### Encryption Support
-- **Full LUKS encryption support maintained** - ZFS runs on top of LUKS encrypted partition
-- TPM unlock support (if available)
-- Optional: Can disable LUKS if desired
+- **ZFS Native Encryption** (NEW) - AES-256-GCM encryption at the dataset level
+- **LUKS Encryption** (Legacy) - Full disk encryption with ZFS on top
+- Both encryption methods are optional
+- TPM unlock support for LUKS (if available)
+- Password prompt at boot for ZFS native encryption
 
 ### Additional Features
 - Automatic ZFS module installation and configuration
 - ZFS-optimized kernel parameters
 - Boot environment snapshots for safe system updates
+- APT hook for automatic boot environment creation before upgrades
+- Web-based installer interface - no manual configuration needed
 
 ## Installation Instructions
 
