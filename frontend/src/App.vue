@@ -440,7 +440,7 @@ export default {
       <fieldset>
         <legend>Password Setup</legend>
         <label for="user_password">Password</label>
-        <input type="password" id="user_password" v-model="user_password" :disabled="running" placeholder="Enter password">
+        <input type="password" id="user_password" v-model="user_password" :disabled="running" placeholder="hunter2">
         
         <label for="user_password_confirm">Confirm Password</label>
         <input type="password" id="user_password_confirm" v-model="user_password_confirm" :disabled="running" placeholder="Confirm password">
