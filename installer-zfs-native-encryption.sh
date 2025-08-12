@@ -16,6 +16,7 @@ NVIDIA_PACKAGE=
 ENABLE_POPCON=false
 ENABLE_UBUNTU_THEME=false
 ENABLE_SUDO=false
+DISABLE_ROOT=false
 SSH_PUBLIC_KEY=
 AFTER_INSTALLED_CMD=
 fi
@@ -340,7 +341,13 @@ else
     chroot ${target} useradd -m -s /bin/bash ${USERNAME} || exit 1
 fi
 echo "${USERNAME}:${USER_PASSWORD}" | chroot ${target} chpasswd || exit 1
-echo "root:${ROOT_PASSWORD}" | chroot ${target} chpasswd || exit 1
+
+if [ "${DISABLE_ROOT}" == "true" ]; then
+    notify disabling root account
+    chroot ${target} passwd -l root || exit 1
+else
+    echo "root:${ROOT_PASSWORD}" | chroot ${target} chpasswd || exit 1
+fi
 
 # Configure sudo
 echo "${USERNAME} ALL=(ALL:ALL) ALL" > ${target}/etc/sudoers.d/${USERNAME} || exit 1

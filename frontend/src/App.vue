@@ -44,6 +44,7 @@ export default {
         ENABLE_POPCON: undefined,
         ENABLE_UBUNTU_THEME: false,
         ENABLE_SUDO: false,
+        DISABLE_ROOT: false,
         SSH_PUBLIC_KEY: undefined,
         AFTER_INSTALLED_CMD: undefined,
       }
@@ -60,6 +61,11 @@ export default {
         ret = false;
       }
       
+      // Check sudo is enabled if root is disabled
+      if (this.installer.DISABLE_ROOT && !this.installer.ENABLE_SUDO) {
+        ret = false;
+      }
+      
       // Check required fields
       for(const [key, value] of Object.entries(this.installer)) {
         if(key === "ENCRYPTION_PASSWORD" && !this.installer.ENABLE_ENCRYPTION) {
@@ -71,7 +77,7 @@ export default {
         if(key === "NVIDIA_PACKAGE") {
           continue; // Optional
         }
-        if(key === "ENABLE_UBUNTU_THEME" || key === "ENABLE_POPCON" || key === "ENABLE_TPM" || key === "ENABLE_SUDO") {
+        if(key === "ENABLE_UBUNTU_THEME" || key === "ENABLE_POPCON" || key === "ENABLE_TPM" || key === "ENABLE_SUDO" || key === "DISABLE_ROOT") {
           continue; // Optional checkboxes
         }
         if(typeof value === 'undefined' || value === null || value === "") {
@@ -96,6 +102,11 @@ export default {
         missing.push('Password confirmation (passwords must match)');
       }
       
+      // Check sudo requirement when root is disabled
+      if (this.installer.DISABLE_ROOT && !this.installer.ENABLE_SUDO) {
+        missing.push('Sudo access (required when root account is disabled)');
+      }
+      
       for(const [key, value] of Object.entries(this.installer)) {
         if(key === "ENCRYPTION_PASSWORD" && !this.installer.ENABLE_ENCRYPTION) {
           continue;
@@ -103,7 +114,7 @@ export default {
         if(key === "USER_PASSWORD" || key === "ROOT_PASSWORD") {
           continue; // Handled by password validation above
         }
-        if(key === "NVIDIA_PACKAGE" || key === "ENABLE_UBUNTU_THEME" || key === "ENABLE_POPCON" || key === "ENABLE_TPM" || key === "ENABLE_SUDO") {
+        if(key === "NVIDIA_PACKAGE" || key === "ENABLE_UBUNTU_THEME" || key === "ENABLE_POPCON" || key === "ENABLE_TPM" || key === "ENABLE_SUDO" || key === "DISABLE_ROOT") {
           continue; // Optional
         }
         if(typeof value === 'undefined' || value === null || value === "") {
@@ -360,6 +371,13 @@ export default {
       if (this.use_same_password) {
         this.updatePasswordsFromMain();
       }
+    },
+    
+    'installer.DISABLE_ROOT'() {
+      // Force sudo when root is disabled
+      if (this.installer.DISABLE_ROOT) {
+        this.installer.ENABLE_SUDO = true;
+      }
     }
   }
 }
@@ -443,8 +461,15 @@ export default {
         <input type="text" id="USER_FULL_NAME" v-model="installer.USER_FULL_NAME" :disabled="running">
         
         <br>
-        <input type="checkbox" v-model="installer.ENABLE_SUDO" id="ENABLE_SUDO" class="inline mt-3" :disabled="running">
+        <input type="checkbox" v-model="installer.DISABLE_ROOT" id="DISABLE_ROOT" class="inline mt-3" :disabled="running">
+        <label for="DISABLE_ROOT" class="inline mt-3">Disable root account (more secure)</label>
+        
+        <br>
+        <input type="checkbox" v-model="installer.ENABLE_SUDO" id="ENABLE_SUDO" class="inline mt-3" :disabled="running" :required="installer.DISABLE_ROOT">
         <label for="ENABLE_SUDO" class="inline mt-3">Add user to sudo group (allows admin access)</label>
+        <small v-if="installer.DISABLE_ROOT" class="sudo-required">
+          Required when root account is disabled
+        </small>
       </fieldset>
 
       <fieldset>
@@ -619,6 +644,15 @@ label:not(.inline) {
   margin: 4px 0;
   color: #c62828;
   font-size: 0.9em;
+}
+
+.sudo-required {
+  display: block;
+  color: #d32f2f;
+  font-style: italic;
+  margin-top: 4px;
+  font-size: 0.9em;
+  font-weight: bold;
 }
 
 @media (min-width: 1024px) {
