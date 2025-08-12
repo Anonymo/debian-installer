@@ -53,6 +53,9 @@ export default {
         if(key === "NVIDIA_PACKAGE") {
           continue; // Optional
         }
+        if(key === "ENABLE_UBUNTU_THEME" || key === "ENABLE_POPCON") {
+          continue; // Optional checkboxes
+        }
         if(typeof value === 'undefined' || value === null || value === "") {
           if(key !== "SSH_PUBLIC_KEY" && key !== "AFTER_INSTALLED_CMD") {
             ret = false;
@@ -61,6 +64,28 @@ export default {
         }
       }
       return ret;
+    },
+    missing_fields() {
+      let missing = [];
+      if(this.error_message.length > 0) {
+        return ['Error: ' + this.error_message];
+      }
+      
+      for(const [key, value] of Object.entries(this.installer)) {
+        if(key === "ENCRYPTION_PASSWORD" && !this.installer.ENABLE_ENCRYPTION) {
+          continue;
+        }
+        if(key === "NVIDIA_PACKAGE" || key === "ENABLE_UBUNTU_THEME" || key === "ENABLE_POPCON") {
+          continue; // Optional
+        }
+        if(typeof value === 'undefined' || value === null || value === "") {
+          if(key !== "SSH_PUBLIC_KEY" && key !== "AFTER_INSTALLED_CMD") {
+            let fieldName = key.toLowerCase().replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            missing.push(fieldName);
+          }
+        }
+      }
+      return missing;
     },
     hostname() {
       return window.location.hostname;
@@ -345,6 +370,14 @@ export default {
 
       <fieldset>
         <legend>Process</legend>
+        
+        <div v-if="!can_start && missing_fields.length > 0" class="validation-message">
+          <p><strong>Please fill in the following required fields:</strong></p>
+          <ul>
+            <li v-for="field in missing_fields" :key="field">{{ field }}</li>
+          </ul>
+        </div>
+        
         <button type="button" @click="install()"
                 :disabled="!can_start || running">
             Install debian on {{ installer.DISK }} <b>OVERWRITING THE WHOLE DRIVE</b>
@@ -438,6 +471,29 @@ label:not(.inline) {
   a:hover {
     background-color: hsla(160, 100%, 37%, 0.2);
   }
+}
+
+.validation-message {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 4px;
+  padding: 12px;
+  margin: 10px 0;
+  color: #856404;
+}
+
+.validation-message p {
+  margin: 0 0 8px 0;
+  font-weight: bold;
+}
+
+.validation-message ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.validation-message li {
+  margin: 4px 0;
 }
 
 @media (min-width: 1024px) {
