@@ -29,8 +29,9 @@ Our opinions of what a modern installation of Debian should look like in 2025 ar
    ```bash
    curl -L https://raw.githubusercontent.com/Anonymo/debian-installer/master/livecd-quick-install.sh | bash
    ```
-3. Open browser and go to `http://localhost:5000/`
-4. Or follow the manual steps in [LIVE_CD_WEB_INSTALLER.md](LIVE_CD_WEB_INSTALLER.md)
+3. Browser will automatically open to `http://localhost:5000/`
+4. Fill out all required fields in the form (all fields must be filled for Install button to activate)
+5. Or follow the manual steps in [LIVE_CD_WEB_INSTALLER.md](LIVE_CD_WEB_INSTALLER.md)
 
 ### Method 2: Build Custom Installer Image
 
@@ -52,6 +53,12 @@ Our opinions of what a modern installation of Debian should look like in 2025 ar
   - `rpool/ROOT/debian` for the root filesystem
   - `rpool/home` for `/home`
   - `rpool/swap` for swap (zvol)
+
+### Ubuntu-Like Theme Option
+- **NEW**: Optional Ubuntu-like appearance with Yaru theme
+- Installs Yaru theme packages, Ubuntu fonts, and GNOME extensions
+- Configures dash-to-dock, app indicators, and desktop icons
+- Applies automatically on first login after installation
 - Native ZFS compression (LZ4) and optimization
 - ZFS TRIM support for SSDs
 

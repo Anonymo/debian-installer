@@ -14,6 +14,7 @@ HOSTNAME=debian13
 SWAP_SIZE=2
 NVIDIA_PACKAGE=
 ENABLE_POPCON=false
+ENABLE_UBUNTU_THEME=false
 SSH_PUBLIC_KEY=
 AFTER_INSTALLED_CMD=
 fi
@@ -378,6 +379,44 @@ zpool export ${zpool_name} || exit 1
 
 notify "Installation complete!"
 echo "Remove installation media and reboot"
+
+if [ "${ENABLE_UBUNTU_THEME}" == "true" ]; then
+    notify applying Ubuntu-like theme
+    
+    # Install theme packages
+    chroot ${target}/ apt install -y yaru-theme-gnome-shell yaru-theme-gtk yaru-theme-icon \
+        yaru-theme-sound fonts-ubuntu gnome-tweaks \
+        gnome-shell-extension-dash-to-dock gnome-shell-extension-appindicator \
+        gnome-shell-extension-desktop-icons-ng || true
+    
+    # Create script for user theme configuration (runs on first login)
+    cat > ${target}/etc/profile.d/ubuntu-theme-setup.sh <<'EOTHEME'
+#!/bin/bash
+# Apply Ubuntu theme settings for the user on first login
+if [ ! -f "$HOME/.ubuntu-theme-applied" ]; then
+    # Set Yaru theme
+    gsettings set org.gnome.desktop.interface gtk-theme 'Yaru-dark' 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface icon-theme 'Yaru' 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface cursor-theme 'Yaru' 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface font-name 'Ubuntu 11' 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface document-font-name 'Ubuntu 11' 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface monospace-font-name 'Ubuntu Mono 13' 2>/dev/null || true
+    gsettings set org.gnome.desktop.wm.preferences titlebar-font 'Ubuntu Bold 11' 2>/dev/null || true
+    
+    # Enable extensions
+    gsettings set org.gnome.shell enabled-extensions "['dash-to-dock@micxgx.gmail.com', 'appindicatorsupport@rgcjonas.gmail.com', 'ding@rastersoft.com']" 2>/dev/null || true
+    
+    # Configure dash-to-dock
+    gsettings set org.gnome.shell.extensions.dash-to-dock dock-position 'LEFT' 2>/dev/null || true
+    gsettings set org.gnome.shell.extensions.dash-to-dock dock-fixed true 2>/dev/null || true
+    gsettings set org.gnome.shell.extensions.dash-to-dock extend-height true 2>/dev/null || true
+    
+    # Mark as applied
+    touch "$HOME/.ubuntu-theme-applied"
+fi
+EOTHEME
+    chmod +x ${target}/etc/profile.d/ubuntu-theme-setup.sh
+fi
 
 if [ -n "${AFTER_INSTALLED_CMD}" ]; then
     ${AFTER_INSTALLED_CMD}

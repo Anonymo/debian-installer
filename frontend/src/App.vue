@@ -35,6 +35,7 @@ export default {
         SWAP_SIZE: undefined,
         NVIDIA_PACKAGE: " ",  // will be changed in install()
         ENABLE_POPCON: undefined,
+        ENABLE_UBUNTU_THEME: false,
       }
     }
   },
@@ -336,6 +337,10 @@ export default {
         <br>
         <input type="checkbox" v-model="installer.ENABLE_POPCON" id="ENABLE_POPCON" class="inline mt-3" :disabled="running">
         <label for="ENABLE_POPCON" class="inline mt-3">Participate in the <a href="https://popcon.debian.org/" target="_blank">debian package usage survey</a></label>
+
+        <br>
+        <input type="checkbox" v-model="installer.ENABLE_UBUNTU_THEME" id="ENABLE_UBUNTU_THEME" class="inline mt-3" :disabled="running">
+        <label for="ENABLE_UBUNTU_THEME" class="inline mt-3">Apply Ubuntu-like theme (Yaru theme, fonts, and GNOME extensions)</label>
       </fieldset>
 
       <fieldset>
