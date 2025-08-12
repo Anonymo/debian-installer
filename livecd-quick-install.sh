@@ -54,7 +54,7 @@ fi
 # Run the installer
 echo ""
 echo "=== Starting Web Installer ==="
-echo "→ Open your browser and navigate to: http://localhost:5000/opinionated-debian-installer/"
+echo "→ Open your browser and navigate to: http://localhost:5000/"
 echo "→ Press Ctrl+C to stop the installer"
 echo ""
 

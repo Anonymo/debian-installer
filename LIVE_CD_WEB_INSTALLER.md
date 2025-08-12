@@ -9,7 +9,7 @@ Boot the Live CD and run:
 ```bash
 curl -L https://raw.githubusercontent.com/Anonymo/debian-installer/master/livecd-quick-install.sh | bash
 ```
-This will automatically set up everything and start the web installer.
+This will automatically set up everything and start the web installer at http://localhost:5000/
 
 ### Option B: Manual Setup
 
@@ -54,7 +54,7 @@ sudo ./backend/opinionated-installer backend
 #### 4. Open Web Interface
 Open Firefox and navigate to:
 ```
-http://localhost:5000/opinionated-debian-installer/
+http://localhost:5000/
 ```
 
 #### 5. Fill Out the Form
@@ -100,7 +100,7 @@ Edit the backend command to listen on all interfaces:
 ```bash
 sudo ./backend/opinionated-installer backend -listenPort 5000
 ```
-Then access from another machine: `http://<server-ip>:5000/opinionated-debian-installer/`
+Then access from another machine: `http://<server-ip>:5000/`
 
 **Warning**: No encryption/authentication - use only on trusted networks!
 

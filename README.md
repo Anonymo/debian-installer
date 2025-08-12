@@ -29,7 +29,8 @@ Our opinions of what a modern installation of Debian should look like in 2025 ar
    ```bash
    curl -L https://raw.githubusercontent.com/Anonymo/debian-installer/master/livecd-quick-install.sh | bash
    ```
-3. Or follow the manual steps in [LIVE_CD_WEB_INSTALLER.md](LIVE_CD_WEB_INSTALLER.md)
+3. Open browser and go to `http://localhost:5000/`
+4. Or follow the manual steps in [LIVE_CD_WEB_INSTALLER.md](LIVE_CD_WEB_INSTALLER.md)
 
 ### Method 2: Build Custom Installer Image
 
