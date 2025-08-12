@@ -150,77 +150,55 @@ After installation, you'll have a fully optimized Debian system with:
   - `rpool/swap` for swap (zvol)
 - [zectl](https://github.com/johnramsden/zectl) is installed for boot environment management
 - Boot environments allow easy rollback if system updates cause issues
-- The system is installed using an image from the live iso. This will speed up the installation significantly and allow off-line installation.
+- The system is installed using debootstrap from the official Debian repositories (requires internet connection)
 - [Dracut](https://github.com/dracutdevs/dracut/wiki/) is used instead of initramfs-tools
 - [Systemd-boot](https://www.freedesktop.org/wiki/Software/systemd/systemd-boot/) is used instead of grub
 - [Network-manager](https://wiki.debian.org/NetworkManager) is used for networking
 - ZFS native encryption with AES-256-GCM (no LUKS layer needed)
 - [Sudo](https://wiki.debian.org/sudo) is installed and configured for the created user 
 
-## (Optional) Configuration, Automatic Installation
+## Configuration Options
 
-Edit [installer.ini](installer-files/boot/efi/installer.ini) on the first (vfat) partition of the installer image.
-It will allow you to pre-seed and automate the installation.
+This ZFS fork uses the web-based installer interface. Configuration is done through the browser form, not through configuration files. The installer provides:
 
-If you edit it directly in the booted installer image, it is /boot/efi/installer.ini
-Reboot after editing the file for the new values to take effect.
+- Real-time hardware detection and optimization
+- Form validation with helpful error messages  
+- Desktop environment selection
+- Optional features (encryption, development tools, Flatpak)
+- Progress indicators during installation
 
-## Headless Installation
+## Remote Installation
 
-You can use the installer for server installation.
+For headless/remote installation, modify the `livecd-quick-install.sh` script to bind to all interfaces:
 
-As a start, edit the configuration file installer.ini (see above), set option BACK_END_IP_ADDRESS to 0.0.0.0 and reboot the installer.
-**There is no encryption or authentication in the communication so only do this on a trusted network.**
+```bash
+# In the script, change the backend startup line to:
+sudo INSTALLER_SCRIPT="$(pwd)/installer-zfs-native-encryption.sh" \
+     ./backend/opinionated-installer backend -listenPort 5000 -staticHtmlFolder "$(pwd)/frontend/dist"
+```
 
-You have several options to access the installer. 
-Assuming the IP address of the installed machine is 192.168.1.29 and you can reach it from your PC:
+Then access from another machine: `http://<server-ip>:5000/`
 
-* Use the web interface in a browser on a PC - open `http://192.168.1.29/opinionated-debian-installer/`
-* Use the text mode interface - start `opinionated-installer tui -baseUrl http://192.168.1.29:5000`
-* Use curl - again, see the [installer.ini](installer-files/boot/efi/installer.ini) file for list of all options for the form data in -F parameters:
+**Warning**: No encryption/authentication - use only on trusted networks!
 
-      curl -v -F "DISK=/dev/vda" -F "USER_PASSWORD=hunter2" \
-      -F "ROOT_PASSWORD=changeme" -F "ENCRYPTION_PASSWORD=secret" \ 
-      http://192.168.1.29:5000/install
+## Testing in Virtual Machines
 
-* Use curl to prompt for logs:
+This installer works with standard Debian Live CDs in virtual machines:
 
-      curl  http://192.168.1.29:5000/download_log
+### VirtualBox/VMware/QEMU
+1. Download official [Debian Trixie GNOME Live CD](https://cdimage.debian.org/cdimage/weekly-live-builds/amd64/iso-hybrid/)
+2. Create VM with:
+   - **UEFI firmware** (required for systemd-boot)
+   - At least **4GB RAM** (for ZFS)
+   - At least **20GB disk** space
+3. Boot the Live CD
+4. Run the quick installer script
 
-## Testing
-
-**⚠️ Note: Testing for this ZFS fork is pending. The instructions below are from the original BTRFS version and may need adjustments for ZFS.**
-
-If you are testing in a virtual machine, attaching the downloaded image file as a virtual disk, you need to extend it first.
-The image file that you downloaded is shrunk, there is no free space left in the filesystems.
-Use `truncate -s +500M opinionated*.img` to add 500MB to the virtual disk before you attach it to a virtual machine.
-The installer will expand the partitions and filesystem to fill the device.
-
-### Libvirt
-
-To test with [libvirt](https://libvirt.org/), make sure to create the VM with UEFI:
-
-1. Select the _Customize configuration before install_ option at the end of the new VM dialog
-2. In the VM configuration window, _Overview_ tab, _Hypervisor Details_ section, select _Firmware_: _UEFI_
-
-
-To add a TPM module, you need to install the [swtpm-tools](https://packages.debian.org/trixie/swtpm-tools) package.
-
-Attach the downloaded installer image file as _Device type: Disk device_, not ~~CDROM device~~.
-
-### Hyper-V
-
-To test with the MS hyper-v virtualization, make sure to create your VM with [Generation 2](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/plan/Should-I-create-a-generation-1-or-2-virtual-machine-in-Hyper-V). 
-This will enable UEFI.
-TPM can be enabled and Secure Boot disabled in the Security tab of the Hyper-V settings.
-
-You will also need to convert the installer image to VHDx format and make the file not sparse.
-You can use [qemu-img](https://www.qemu.org/docs/master/tools/qemu-img.html) ([windows download](https://qemu.weilnetz.de/w64/)) and fsutil like this:
-
-    qemu-img convert -f raw -O vhdx opinionated-debian-installer-*.img odin.vhdx
-    fsutil sparse setflag odin.vhdx 0
-
-Attach the generated VHDx file as a disk, not as a ~~CD~~.
+### Hardware Detection Notes
+- **NVIDIA detection**: Automatically installs `nvidia-detect` and detects compatible drivers
+- **WiFi firmware**: Automatically detected and installed during setup
+- **Storage optimization**: Automatically detects SSD/NVMe vs HDD for optimal ZFS settings
+- **TPM detection**: Detects TPM version for compatibility reporting (but ZFS encryption doesn't require TPM)
 
 ## Hacking
 
@@ -256,10 +234,13 @@ The following table contains comparison of features between our opinionated debi
 | Manual disk partitioning, LVM, filesystem selection | N[4]  | Y                                                | Y                                                                            |
 | ZFS datasets with boot environments                 | **Y**[2] | N                                                | N                                                                            |
 | Full drive encryption                               | **Y** | Y[1]                                             | Y                                                                            |
-| Passwordless unlock (TPM)                           | **Y** | N                                                | N                                                                            |
+| Passwordless unlock (TPM)                           | N     | N                                                | N                                                                            |
 | Live CD + web installer                            | **Y** | N                                                | N                                                                            |
 | Non-free and backports                              | **Y** | N                                                | N                                                                            |
 | Browser-based installer                             | **Y** | N                                                | N                                                                            |
+| Desktop environment selection                       | **Y** | N                                                | Y                                                                            |
+| Hardware-optimized ZFS settings                    | **Y** | N                                                | N                                                                            |
+| Development tools integration                       | **Y** | N                                                | N                                                                            |
 
 [1] `/boot` needs a separate unencrypted partition
 

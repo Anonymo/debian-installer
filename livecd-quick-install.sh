@@ -26,7 +26,7 @@ sudo systemctl stop named 2>/dev/null || true
 echo "→ Installing dependencies including ZFS support..."
 export DEBIAN_FRONTEND=noninteractive
 echo 'zfs-dkms zfs-dkms/note-incompatible-licenses note true' | sudo debconf-set-selections
-sudo -E apt install -y curl git zfsutils-linux zfs-dkms debootstrap linux-headers-$(uname -r)
+sudo -E apt install -y curl git zfsutils-linux zfs-dkms debootstrap linux-headers-$(uname -r) nvidia-detect
 
 # Load ZFS kernel module
 echo "→ Loading ZFS kernel module..."
