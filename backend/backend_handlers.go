@@ -5,16 +5,19 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 )
 
 func (c *BackendContext) Login(w http.ResponseWriter, _ *http.Request) {
 	type login struct {
-		Hostname  string            `json:"hostname"`
-		HasEfi    bool              `json:"has_efi"`
-		HasNvidia bool              `json:"has_nvidia"`
-		Running   bool              `json:"running"`
-		Environ   map[string]string `json:"environ"`
+		Hostname         string            `json:"hostname"`
+		HasEfi           bool              `json:"has_efi"`
+		HasNvidia        bool              `json:"has_nvidia"`
+		Running          bool              `json:"running"`
+		Environ          map[string]string `json:"environ"`
+		RamGB            int               `json:"ram_gb"`
+		SuggestedSwapGB  int               `json:"suggested_swap_gb"`
 	}
 	data := login{}
 	var err error
@@ -37,6 +40,8 @@ func (c *BackendContext) Login(w http.ResponseWriter, _ *http.Request) {
 	data.HasNvidia = detectNvidia()
 	data.Running = c.runningCmd != nil && c.runningCmd.Process != nil
 	data.Environ = c.runningParameters
+	data.RamGB = detectRAM()
+	data.SuggestedSwapGB = calculateSwapSize(data.RamGB)
 	err = writeJson(w, data)
 	if err != nil {
 		slog.Error("failed to write data", "error", err)
@@ -162,5 +167,54 @@ func (c *BackendContext) Clear(w http.ResponseWriter, _ *http.Request) {
 	if err != nil {
 		slog.Error("failed to stop the process", "error", err)
 		http.Error(w, "failed to stop the process", http.StatusInternalServerError)
+	}
+}
+
+func detectRAM() int {
+	// Read /proc/meminfo to get total memory
+	out, err := runAndGiveStdout("grep", "MemTotal", "/proc/meminfo")
+	if err != nil {
+		slog.Warn("failed to detect RAM, using default", "error", err)
+		return 8 // Default to 8GB if detection fails
+	}
+	
+	// Parse output like: "MemTotal:       16384000 kB"
+	fields := strings.Fields(string(out))
+	if len(fields) < 2 {
+		slog.Warn("unexpected meminfo format")
+		return 8
+	}
+	
+	memKB, err := strconv.Atoi(fields[1])
+	if err != nil {
+		slog.Warn("failed to parse memory value", "error", err)
+		return 8
+	}
+	
+	// Convert KB to GB (rounded)
+	memGB := (memKB + 512*1024) / (1024 * 1024) // Add 512MB for rounding
+	return memGB
+}
+
+func calculateSwapSize(ramGB int) int {
+	// Standard Linux swap recommendations:
+	// RAM <= 2GB: swap = 2 * RAM
+	// 2GB < RAM <= 8GB: swap = RAM
+	// 8GB < RAM <= 64GB: swap = RAM/2, minimum 4GB
+	// RAM > 64GB: swap = 4GB (for hibernation support)
+	
+	switch {
+	case ramGB <= 2:
+		return ramGB * 2
+	case ramGB <= 8:
+		return ramGB
+	case ramGB <= 64:
+		suggested := ramGB / 2
+		if suggested < 4 {
+			return 4
+		}
+		return suggested
+	default:
+		return 4
 	}
 }

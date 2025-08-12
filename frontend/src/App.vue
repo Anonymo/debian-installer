@@ -19,6 +19,8 @@ export default {
       finished: false,
       output_reader_connection: null,
       timezones: [],
+      ram_gb: 0,
+      suggested_swap_gb: 0,
       
       // values for the installer:
       installer: {
@@ -116,6 +118,13 @@ export default {
           }
           this.has_nvidia = response.has_nvidia;
           this.want_nvidia = response.has_nvidia;
+          
+          // Store RAM info and auto-fill swap size
+          this.ram_gb = response.ram_gb || 0;
+          this.suggested_swap_gb = response.suggested_swap_gb || 2;
+          if(response.suggested_swap_gb && this.installer.SWAP_SIZE === undefined) {
+            this.installer.SWAP_SIZE = response.suggested_swap_gb;
+          }
 
           for(const [key, value] of Object.entries(this.installer)) {
             if(key in response.environ) {
@@ -355,6 +364,9 @@ export default {
 
         <label for="SWAP_SIZE">Swap Size (GB)</label>
         <input type="number" id="SWAP_SIZE" v-model="installer.SWAP_SIZE" :disabled="running">
+        <small v-if="ram_gb > 0" class="swap-suggestion">
+          Detected {{ ram_gb }}GB RAM, suggested: {{ suggested_swap_gb }}GB swap
+        </small>
 
         <input type="checkbox" v-model="want_nvidia" id="WANT_NVIDIA" class="inline mt-3" :disabled="!has_nvidia || running">
         <label for="WANT_NVIDIA" class="inline mt-3">Install the proprietary NVIDIA Accelerated Linux Graphics Driver</label>
@@ -494,6 +506,14 @@ label:not(.inline) {
 
 .validation-message li {
   margin: 4px 0;
+}
+
+.swap-suggestion {
+  display: block;
+  color: #666;
+  font-style: italic;
+  margin-top: 4px;
+  font-size: 0.9em;
 }
 
 @media (min-width: 1024px) {
