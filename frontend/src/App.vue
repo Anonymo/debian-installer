@@ -78,7 +78,7 @@ export default {
         if(key === "NVIDIA_PACKAGE") {
           continue; // Optional
         }
-        if(key === "ENABLE_UBUNTU_THEME" || key === "ENABLE_POPCON" || key === "ENABLE_TPM" || key === "ENABLE_SUDO" || key === "DISABLE_ROOT" || key === "DESKTOP_ENVIRONMENT" || key === "ENABLE_FLATPAK" || key === "ENABLE_DEV_TOOLS") {
+        if(key === "ENABLE_UBUNTU_THEME" || key === "ENABLE_POPCON" || key === "ENABLE_SUDO" || key === "DISABLE_ROOT" || key === "DESKTOP_ENVIRONMENT" || key === "ENABLE_FLATPAK" || key === "ENABLE_DEV_TOOLS") {
           continue; // Optional checkboxes and dropdown
         }
         if(typeof value === 'undefined' || value === null || value === "") {

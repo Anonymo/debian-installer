@@ -9,7 +9,7 @@ USER_PASSWORD=hunter2
 ROOT_PASSWORD=changeme
 ENABLE_ENCRYPTION=false
 ENCRYPTION_PASSWORD=
-ENABLE_TPM=true
+# TPM support not implemented for ZFS native encryption
 HOSTNAME=debian13
 SWAP_SIZE=2
 NVIDIA_PACKAGE=
@@ -43,8 +43,7 @@ function progress () {
 
 DEBIAN_VERSION=trixie
 BACKPORTS_VERSION=${DEBIAN_VERSION}  # TODO append "-backports" when available
-# see https://www.freedesktop.org/software/systemd/man/systemd-cryptenroll.html#--tpm2-pcrs=PCR
-TPM_PCRS="7+14"
+# ZFS native encryption uses passphrase prompt, not TPM integration
 # do not enable this on a live-cd
 SHARE_APT_ARCHIVE=false
 # Will be set based on hardware detection

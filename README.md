@@ -154,7 +154,7 @@ After installation, you'll have a fully optimized Debian system with:
 - [Dracut](https://github.com/dracutdevs/dracut/wiki/) is used instead of initramfs-tools
 - [Systemd-boot](https://www.freedesktop.org/wiki/Software/systemd/systemd-boot/) is used instead of grub
 - [Network-manager](https://wiki.debian.org/NetworkManager) is used for networking
-- [Systemd-cryptenroll](https://www.freedesktop.org/software/systemd/man/systemd-cryptenroll.html#--tpm2-device=PATH) is used to unlock the disk, using TPM (if available)
+- ZFS native encryption with AES-256-GCM (no LUKS layer needed)
 - [Sudo](https://wiki.debian.org/sudo) is installed and configured for the created user 
 
 ## (Optional) Configuration, Automatic Installation
