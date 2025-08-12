@@ -1,0 +1,88 @@
+name: Build and Release Installer
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.5'
+        cache-dependency-path: backend/go.sum
+
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'npm'
+        cache-dependency-path: 'frontend/package-lock.json'
+
+    - name: Build Frontend
+      run: |
+        cd frontend
+        npm ci
+        npm run build
+
+    - name: Embed Frontend in Binary
+      run: |
+        cd backend
+        # Create embedded assets
+        mkdir -p static
+        cp -r ../frontend/dist/* static/
+        
+    - name: Build Backend Binary
+      run: |
+        cd backend
+        export GOARCH=amd64
+        export CGO_ENABLED=0
+        go build -v -ldflags="-s -w" -o opinionated-installer-linux-amd64
+        
+        # Create archive with everything needed
+        cd ..
+        mkdir -p release
+        cp backend/opinionated-installer-linux-amd64 release/
+        cp installer-zfs-native-encryption.sh release/
+        cp livecd-quick-install.sh release/
+        cp -r frontend/dist release/frontend-dist
+        
+        # Create tarball
+        tar czf debian-installer-release.tar.gz release/
+
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          backend/opinionated-installer-linux-amd64
+          debian-installer-release.tar.gz
+          livecd-quick-install.sh
+        body: |
+          ## Quick Install on Live CD
+          
+          ```bash
+          # Download and run the quick installer
+          curl -L https://github.com/Anonymo/debian-installer/releases/latest/download/livecd-quick-install.sh | bash
+          ```
+          
+          Or download the pre-built binary:
+          ```bash
+          curl -LO https://github.com/Anonymo/debian-installer/releases/latest/download/opinionated-installer-linux-amd64
+          chmod +x opinionated-installer-linux-amd64
+          sudo ./opinionated-installer-linux-amd64 backend
+          ```
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: installer-bundle
+        path: |
+          backend/opinionated-installer-linux-amd64
+          debian-installer-release.tar.gz

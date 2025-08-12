@@ -25,8 +25,11 @@ Our opinions of what a modern installation of Debian should look like in 2025 ar
 **No custom ISO build required!** Boot an official Debian Live CD and run the web installer:
 
 1. Download [Debian Trixie GNOME Live CD](https://cdimage.debian.org/cdimage/weekly-live-builds/amd64/iso-hybrid/)
-2. Boot the Live CD and follow [LIVE_CD_WEB_INSTALLER.md](LIVE_CD_WEB_INSTALLER.md)
-3. Access the web installer at `http://localhost:5000/opinionated-debian-installer/`
+2. Boot the Live CD and run:
+   ```bash
+   curl -L https://raw.githubusercontent.com/Anonymo/debian-installer/master/livecd-quick-install.sh | bash
+   ```
+3. Or follow the manual steps in [LIVE_CD_WEB_INSTALLER.md](LIVE_CD_WEB_INSTALLER.md)
 
 ### Method 2: Build Custom Installer Image
 

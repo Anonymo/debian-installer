@@ -4,12 +4,21 @@ This guide shows how to use the official Debian Trixie GNOME Live CD with the we
 
 ## Quick Start
 
-### 1. Get Official Debian Live CD
+### Option A: One-Line Installer (Easiest)
+Boot the Live CD and run:
+```bash
+curl -L https://raw.githubusercontent.com/Anonymo/debian-installer/master/livecd-quick-install.sh | bash
+```
+This will automatically set up everything and start the web installer.
+
+### Option B: Manual Setup
+
+#### 1. Get Official Debian Live CD
 Download from: https://cdimage.debian.org/cdimage/weekly-live-builds/amd64/iso-hybrid/
 - Look for: `debian-live-testing-amd64-gnome.iso`
 - Write to USB: `sudo dd if=debian-live-testing-amd64-gnome.iso of=/dev/sdX bs=4M status=progress`
 
-### 2. Boot and Install Dependencies
+#### 2. Boot and Install Dependencies
 Boot the Live CD and open a terminal:
 ```bash
 # Enable non-free and contrib repositories
@@ -25,7 +34,7 @@ git clone https://github.com/Anonymo/debian-installer.git
 cd debian-installer
 ```
 
-### 3. Build and Run Web Installer
+#### 3. Build and Run Web Installer
 ```bash
 # Build frontend
 cd frontend
@@ -42,13 +51,13 @@ cd ..
 sudo ./backend/opinionated-installer backend
 ```
 
-### 4. Open Web Interface
+#### 4. Open Web Interface
 Open Firefox and navigate to:
 ```
 http://localhost:5000/opinionated-debian-installer/
 ```
 
-### 5. Fill Out the Form
+#### 5. Fill Out the Form
 The web interface provides a user-friendly form with:
 - **Disk Selection**: Choose your target disk from dropdown
 - **User Configuration**: Username, password, full name
