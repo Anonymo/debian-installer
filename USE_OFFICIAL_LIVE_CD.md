@@ -36,8 +36,11 @@ sudo apt update
 sudo systemctl stop bind9 2>/dev/null || true
 sudo systemctl stop named 2>/dev/null || true
 
-# Install required dependencies
-sudo apt install -y cryptsetup debootstrap uuid-runtime zfsutils-linux dosfstools curl git
+# Install required dependencies including ZFS support
+sudo apt install -y cryptsetup debootstrap uuid-runtime zfsutils-linux zfs-dkms dosfstools curl git linux-headers-$(uname -r)
+
+# Load ZFS kernel module
+sudo modprobe zfs || echo "ZFS module will be built by DKMS"
 
 # If you want the web interface, also install:
 sudo apt install -y npm golang-go

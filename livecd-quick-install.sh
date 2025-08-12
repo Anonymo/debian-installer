@@ -21,9 +21,13 @@ echo "→ Stopping conflicting services..."
 sudo systemctl stop bind9 2>/dev/null || true
 sudo systemctl stop named 2>/dev/null || true
 
-# Install minimal dependencies to download and run pre-built binary
-echo "→ Installing minimal dependencies..."
-sudo apt install -y curl git zfsutils-linux debootstrap
+# Install dependencies including ZFS support
+echo "→ Installing dependencies including ZFS support..."
+sudo apt install -y curl git zfsutils-linux zfs-dkms debootstrap linux-headers-$(uname -r)
+
+# Load ZFS kernel module
+echo "→ Loading ZFS kernel module..."
+sudo modprobe zfs 2>/dev/null || echo "ZFS module loading failed - it will be built during DKMS install"
 
 # Clone the repository
 echo "→ Cloning installer repository..."

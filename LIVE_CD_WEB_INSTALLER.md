@@ -32,7 +32,10 @@ sudo apt update
 sudo systemctl stop bind9 2>/dev/null || true
 sudo systemctl stop named 2>/dev/null || true
 
-sudo apt install -y git golang-go npm zfsutils-linux debootstrap
+sudo apt install -y git golang-go npm zfsutils-linux zfs-dkms debootstrap linux-headers-$(uname -r)
+
+# Load ZFS kernel module
+sudo modprobe zfs || echo "ZFS module will be built by DKMS"
 
 # Clone the installer
 git clone https://github.com/Anonymo/debian-installer.git
