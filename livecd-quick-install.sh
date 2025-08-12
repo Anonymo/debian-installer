@@ -7,10 +7,10 @@ set -e
 echo "=== Debian Installer Quick Setup for Live CD ==="
 echo ""
 
-# Enable non-free and contrib repositories
+# Enable non-free and contrib repositories (skip cdrom lines)
 echo "→ Enabling non-free and contrib repositories..."
-sudo sed -i 's/main/main contrib non-free non-free-firmware/g' /etc/apt/sources.list 2>/dev/null || true
-sudo sed -i 's/main/main contrib non-free non-free-firmware/g' /etc/apt/sources.list.d/*.sources 2>/dev/null || true
+sudo sed -i '/^deb cdrom/!s/main[[:space:]]*$/main contrib non-free non-free-firmware/' /etc/apt/sources.list 2>/dev/null || true
+sudo sed -i '/^deb cdrom/!s/main[[:space:]]*$/main contrib non-free non-free-firmware/' /etc/apt/sources.list.d/*.sources 2>/dev/null || true
 
 # Update package lists
 echo "→ Updating package lists..."
@@ -57,17 +57,32 @@ echo "=== Starting Web Installer ==="
 echo "→ The installer will be available at: http://localhost:5000/"
 echo ""
 
+# Run the backend in background first with correct static path
+echo "→ Starting backend server..."
+sudo INSTALLER_SCRIPT="$(pwd)/installer-zfs-native-encryption.sh" ./backend/opinionated-installer backend -staticHtmlFolder "$(pwd)/frontend/dist" &
+BACKEND_PID=$!
+
+# Wait for backend to start
+echo "→ Waiting for server to start..."
+for i in {1..10}; do
+    if curl -s http://localhost:5000/ >/dev/null 2>&1; then
+        echo "→ Server is ready!"
+        break
+    fi
+    sleep 1
+done
+
 # Try to open Firefox automatically
 if command -v firefox &> /dev/null; then
     echo "→ Opening Firefox browser..."
     firefox http://localhost:5000/ &>/dev/null &
-    sleep 2
 else
     echo "→ Please open your browser and navigate to: http://localhost:5000/"
 fi
 
+echo ""
 echo "→ Press Ctrl+C to stop the installer"
 echo ""
 
-# Run the backend
-sudo ./backend/opinionated-installer backend
+# Wait for backend process
+wait $BACKEND_PID
