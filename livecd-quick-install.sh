@@ -7,10 +7,10 @@ set -e
 echo "=== Debian Installer Quick Setup for Live CD ==="
 echo ""
 
-# Enable non-free-firmware repository (skip cdrom lines)
-echo "→ Enabling non-free-firmware repository..."
-# Skip cdrom lines, add non-free-firmware to others ending with 'main'
-sudo awk '/^deb cdrom/ {print; next} /main$/ {gsub(/main$/, "main non-free-firmware")} {print}' /etc/apt/sources.list > /tmp/sources.list.tmp && sudo mv /tmp/sources.list.tmp /etc/apt/sources.list 2>/dev/null || true
+# Enable contrib and non-free repositories (skip first line and deb-src lines)
+echo "→ Enabling contrib and non-free repositories..."
+# Skip first line, only modify 'deb' lines (not deb-src), add contrib non-free non-free-firmware
+sudo awk 'NR==1 {print; next} /^deb-src/ {print; next} /^deb / && /main$/ {gsub(/main$/, "main contrib non-free non-free-firmware")} {print}' /etc/apt/sources.list > /tmp/sources.list.tmp && sudo mv /tmp/sources.list.tmp /etc/apt/sources.list 2>/dev/null || true
 
 # Update package lists
 echo "→ Updating package lists..."
