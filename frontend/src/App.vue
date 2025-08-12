@@ -1,10 +1,8 @@
 <script>
-import Password from "./components/Password.vue";
 import timezonesTxt from './assets/timezones.txt?raw';
 import {nextTick, provide, ref} from "vue";
 
 export default {
-  components: {Password},
   data() {
     return {
       error_message: "",

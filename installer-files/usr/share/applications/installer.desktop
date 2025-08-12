@@ -1,7 +1,0 @@
-[Desktop Entry]
-Encoding=UTF-8
-Version=1.0
-Type=Application
-Exec=firefox http://localhost:5000/
-Name=Opinionated Debian Installer
-Icon=emblem-debian.png

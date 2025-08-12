@@ -33,17 +33,22 @@ Our opinions of what a modern installation of Debian should look like in 2025 ar
 4. Fill out all required fields in the form (all fields must be filled for Install button to activate)
 5. Or follow the manual steps in [LIVE_CD_WEB_INSTALLER.md](LIVE_CD_WEB_INSTALLER.md)
 
-### Method 2: Build Custom Installer Image
+### Method 2: Manual Installation with Script
 
-**Note: Pre-built images are not yet available for this ZFS fork.**
+For advanced users who prefer command-line installation:
 
-1. Clone this repository:
+1. Boot any Debian Live CD and run:
    ```bash
-   git clone https://github.com/Anonymo/debian-installer.git
-   cd debian-installer
+   # Download and run the ZFS installer script directly
+   curl -L https://raw.githubusercontent.com/Anonymo/debian-installer/master/installer-zfs-native-encryption.sh -o installer.sh
+   chmod +x installer.sh
+   
+   # Edit the variables at the top of the script
+   nano installer.sh
+   
+   # Run the installer
+   sudo ./installer.sh
    ```
-
-2. Follow the instructions in the [Creating Your Own Installer Image](#creating-your-own-installer-image) section below
 
 ## What's Different in This Fork
 
@@ -81,13 +86,9 @@ Our opinions of what a modern installation of Debian should look like in 2025 ar
 - APT hook for automatic boot environment creation before upgrades
 - Web-based installer interface - no manual configuration needed
 
-## Installation Instructions
+## Installation Result
 
-1. Build the installer image (see [Creating Your Own Installer Image](#creating-your-own-installer-image))
-2. Write the image file to a USB flash drive. **Do not use ventoy** or similar "clever" tools - they are not compatible with these images. If you need a GUI, use [etcher](https://github.com/balena-io/etcher/releases) or [win32DiskImager](https://sourceforge.net/projects/win32diskimager/files/Archive/) or just use dd - `dd if=opinionated-debian-installer*.img of=/dev/sdX bs=256M oflag=dsync status=progress` where sdX is your USB flash drive 
-3. Boot from the USB flash drive
-4. Start the installer icon from the desktop/dash, fill in the form in the browser and press the big _Install_ button
-5. Reboot and enjoy your ZFS-based Debian system
+After installation, you'll have:
 
 ## Details
 
@@ -176,82 +177,25 @@ Attach the generated VHDx file as a disk, not as a ~~CD~~.
 
 ## Hacking
 
-Alternatively to running the whole browser based GUI, you can run the `installer.sh` script manually from a root shell.
-The end result will be exactly the same.
-Just don't forget to edit the configuration options (especially the `DISK` variable) before running it.
+## Development
 
-### Creating Your Own Installer Image
+### Building the Frontend
 
- 1. Install required build dependencies:
-    ```bash
-    apt-get install debootstrap zfsutils-linux npm golang
-    ```
- 2. Build the frontend and backend:
-    ```bash
-    cd frontend && npm install && npm run build && cd ..
-    cd backend && go build -o opinionated-installer && cd ..
-    ```
- 3. Insert a blank storage device
- 4. Edit the **DISK** variable at the top of files `make_image_*.sh`
- 5. Execute the `make_image_*.sh` files as root:
-    ```bash
-    sudo ./make_image_1.sh
-    # Follow prompts, then power off and add 500MB to disk
-    sudo ./make_image_2.sh
-    # Reboot when prompted
-    sudo ./make_image_3.sh
-    ```
+The frontend is a [Vue.js](https://vuejs.org/) application. Build it with:
 
-In the first stage of image generation, you will get a _tasksel_ prompt where you can select a different set of packages for your image.
-
-### Installer Image Structure
-
-There are 3 GPT partitions on the installer image:
-
- 1. EFI boot partition
- 2. Base Image - ZFS pool with LZ4 compression
-    - When the live system is running, this is used as a [read-only lower device for overlayfs](https://docs.kernel.org/filesystems/overlayfs.html)
-    - When installing the target system, the installer will copy this to the target system, mount it read-write, and continue with the system installation
- 3. Top Overlay - ZFS pool for the upper and work device for the overlayfs for the live system. The changes you make while the live system is running are persisted here
-
-### Building the Front-End
-
-The front-end is a [vue](https://vuejs.org/) application. 
-You need [npm](https://www.npmjs.com/) to build it.
-Run the following commands to build it:
-
-    cd frontend
-    npm run build
-
-### Building the HTTP Backend and the Text-User-Interface Frontend
-
-The HTTP backend and TUI frontend is a [go](https://go.dev/) application.
-Run the following commands to build it:
-
-    cd backend
-    go build -o opinionated-installer
-
-### Configuration Flow
-
-```mermaid
-flowchart LR
-    A[installer.ini] -->|EnvironmentFile| B(installer_backend.service)
-    B -->|ExecStart| C[backend]
-    D(Web Frontend) --->|HTTP POST| C
-    E(TUI Frontend) --->|HTTP POST| C
-    G(curl) --->|HTTP POST| C
-    C -->|environment| F[installer.sh]
+```bash
+cd frontend
+npm install
+npm run build
 ```
 
-### Output Flow
+### Building the Backend
 
-```mermaid
-flowchart RL
-    C[backend] -->|stdout| B(installer_backend.service)
-    C --->|websocket| D(Web Frontend)
-    C --->|websocket| E(TUI Frontend)
-    C --->|HTTP GET| G(curl)
-    F[installer.sh] -->|stdout| C
+The backend is a [Go](https://go.dev/) application. Build it with:
+
+```bash
+cd backend
+go build -o opinionated-installer
 ```
 
 ## Comparison
@@ -266,7 +210,7 @@ The following table contains comparison of features between our opinionated debi
 | ZFS datasets with boot environments                 | **Y**[2] | N                                                | N                                                                            |
 | Full drive encryption                               | **Y** | Y[1]                                             | Y                                                                            |
 | Passwordless unlock (TPM)                           | **Y** | N                                                | N                                                                            |
-| Image-based installation                            | **Y** | N                                                | N                                                                            |
+| Live CD + web installer                            | **Y** | N                                                | N                                                                            |
 | Non-free and backports                              | **Y** | N                                                | N                                                                            |
 | Browser-based installer                             | **Y** | N                                                | N                                                                            |
 
