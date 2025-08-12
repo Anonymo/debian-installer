@@ -62,6 +62,11 @@ echo "=== Starting Web Installer ==="
 echo "→ The installer will be available at: http://localhost:5000/"
 echo ""
 
+# Stop any conflicting services before starting backend
+echo "→ Stopping conflicting services..."
+sudo systemctl stop bind9 2>/dev/null || true
+sudo systemctl stop named 2>/dev/null || true
+
 # Run the backend in background first with correct static path
 echo "→ Starting backend server..."
 sudo INSTALLER_SCRIPT="$(pwd)/installer-zfs-native-encryption.sh" ./backend/opinionated-installer backend -staticHtmlFolder "$(pwd)/frontend/dist" &

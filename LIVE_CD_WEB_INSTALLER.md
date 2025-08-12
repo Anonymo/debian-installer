@@ -51,6 +51,10 @@ cd backend
 go build -o opinionated-installer
 cd ..
 
+# Stop conflicting services before starting backend
+sudo systemctl stop bind9 2>/dev/null || true
+sudo systemctl stop named 2>/dev/null || true
+
 # Run the installer backend with correct paths
 sudo INSTALLER_SCRIPT="$(pwd)/installer-zfs-native-encryption.sh" \
      ./backend/opinionated-installer backend -staticHtmlFolder "$(pwd)/frontend/dist"
