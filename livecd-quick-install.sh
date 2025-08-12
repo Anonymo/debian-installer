@@ -12,7 +12,6 @@ echo "→ Enabling contrib and non-free repositories..."
 # Modify existing sources.list to add contrib and non-free 
 sudo sed -i '/^deb http.*debian.*trixie.*main$/s/main$/main contrib non-free/' /etc/apt/sources.list
 sudo sed -i '/^deb-src http.*debian.*trixie.*main$/s/main$/main contrib non-free/' /etc/apt/sources.list
-sudo sed -i '/^deb http.*security.*trixie-security.*main$/s/main$/main contrib non-free/' /etc/apt/sources.list
 
 # Update package lists
 echo "→ Updating package lists..."
