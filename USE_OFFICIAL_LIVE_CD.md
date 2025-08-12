@@ -13,6 +13,8 @@ This guide explains how to use the official Debian Trixie GNOME Live CD with thi
    sudo dd if=debian-live-testing-amd64-gnome.iso of=/dev/sdX bs=4M status=progress
    ```
    Replace `/dev/sdX` with your USB device.
+   
+   **If using Ventoy**: You may need to select "Boot with GRUB2 style" option when booting the ISO.
 
 ## Steps to Run Installer from Live CD
 

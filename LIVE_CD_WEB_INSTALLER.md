@@ -17,6 +17,7 @@ This will automatically set up everything and start the web installer at http://
 Download from: https://cdimage.debian.org/cdimage/weekly-live-builds/amd64/iso-hybrid/
 - Look for: `debian-live-testing-amd64-gnome.iso`
 - Write to USB: `sudo dd if=debian-live-testing-amd64-gnome.iso of=/dev/sdX bs=4M status=progress`
+- **If using Ventoy**: You may need to select "Boot with GRUB2 style" option when booting the ISO
 
 #### 2. Boot and Install Dependencies
 Boot the Live CD and open a terminal:
