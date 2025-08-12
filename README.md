@@ -1,6 +1,21 @@
 # Opinionated Debian Installer - ZFS Fork
 
-**This is a fork of the [original Opinionated Debian Installer](https://github.com/r0b0/debian-installer) that replaces BTRFS with ZFS and adds boot environment management via [zectl](https://github.com/johnramsden/zectl).**
+**This is a fork of the [original Opinionated Debian Installer](https://github.com/r0b0/debian-installer) created by [r0b0](https://github.com/r0b0) that replaces BTRFS with ZFS and adds boot environment management via [zectl](https://github.com/johnramsden/zectl).**
+
+## Credits
+
+This project is based on the excellent work by multiple contributors:
+
+- **Original Project**: [Opinionated Debian Installer](https://github.com/r0b0/debian-installer) by [r0b0](https://github.com/r0b0)
+  - Core installer framework, web interface, and system installation logic
+
+- **Ubuntu Theme Implementation**: [make-debian-look-like-ubuntu](https://github.com/DeltaLima/make-debian-look-like-ubuntu) by [DeltaLima](https://github.com/DeltaLima)
+  - Ubuntu theme configuration scripts and GNOME customization approach
+
+- **ZFS Fork Enhancements**: Additional features and ZFS integration by this fork
+  - Desktop environment selection, hardware optimization, development tools integration
+
+We extend our gratitude to all the original developers for creating the foundation that made this ZFS-enhanced version possible.
 
 This tool can be used to create a modern installation of Debian. 
 Our opinions of what a modern installation of Debian should look like in 2025 are:
