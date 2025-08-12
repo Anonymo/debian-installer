@@ -22,6 +22,11 @@ export default {
       ram_gb: 0,
       suggested_swap_gb: 0,
       
+      // password handling
+      user_password: "",
+      user_password_confirm: "",
+      use_same_password: false,
+      
       // values for the installer:
       installer: {
         DISK: undefined,
@@ -38,6 +43,9 @@ export default {
         NVIDIA_PACKAGE: " ",  // will be changed in install()
         ENABLE_POPCON: undefined,
         ENABLE_UBUNTU_THEME: false,
+        ENABLE_SUDO: false,
+        SSH_PUBLIC_KEY: undefined,
+        AFTER_INSTALLED_CMD: undefined,
       }
     }
   },
@@ -47,15 +55,23 @@ export default {
       if(this.error_message.length>0) {
         ret = false;
       }
+      // Check password validation first
+      if (!this.has_valid_password) {
+        ret = false;
+      }
+      
       // Check required fields
       for(const [key, value] of Object.entries(this.installer)) {
         if(key === "ENCRYPTION_PASSWORD" && !this.installer.ENABLE_ENCRYPTION) {
           continue;
         }
+        if(key === "USER_PASSWORD" || key === "ROOT_PASSWORD") {
+          continue; // Handled by password validation above
+        }
         if(key === "NVIDIA_PACKAGE") {
           continue; // Optional
         }
-        if(key === "ENABLE_UBUNTU_THEME" || key === "ENABLE_POPCON") {
+        if(key === "ENABLE_UBUNTU_THEME" || key === "ENABLE_POPCON" || key === "ENABLE_TPM" || key === "ENABLE_SUDO") {
           continue; // Optional checkboxes
         }
         if(typeof value === 'undefined' || value === null || value === "") {
@@ -73,11 +89,21 @@ export default {
         return ['Error: ' + this.error_message];
       }
       
+      // Check password validation
+      if (!this.user_password) {
+        missing.push('Password');
+      } else if (!this.passwords_match) {
+        missing.push('Password confirmation (passwords must match)');
+      }
+      
       for(const [key, value] of Object.entries(this.installer)) {
         if(key === "ENCRYPTION_PASSWORD" && !this.installer.ENABLE_ENCRYPTION) {
           continue;
         }
-        if(key === "NVIDIA_PACKAGE" || key === "ENABLE_UBUNTU_THEME" || key === "ENABLE_POPCON") {
+        if(key === "USER_PASSWORD" || key === "ROOT_PASSWORD") {
+          continue; // Handled by password validation above
+        }
+        if(key === "NVIDIA_PACKAGE" || key === "ENABLE_UBUNTU_THEME" || key === "ENABLE_POPCON" || key === "ENABLE_TPM" || key === "ENABLE_SUDO") {
           continue; // Optional
         }
         if(typeof value === 'undefined' || value === null || value === "") {
@@ -91,6 +117,14 @@ export default {
     },
     hostname() {
       return window.location.hostname;
+    },
+    
+    passwords_match() {
+      return this.user_password === this.user_password_confirm;
+    },
+    
+    has_valid_password() {
+      return this.user_password.length >= 3 && this.passwords_match;
     }
   },
   setup() {
@@ -204,6 +238,18 @@ export default {
     },
     install() {
       this.running = true;
+      
+      // Ensure passwords are set before installation
+      if (this.use_same_password || !this.installer.USER_PASSWORD) {
+        this.installer.USER_PASSWORD = this.user_password;
+      }
+      if (this.use_same_password || !this.installer.ROOT_PASSWORD) {
+        this.installer.ROOT_PASSWORD = this.user_password;
+      }
+      if (this.installer.ENABLE_ENCRYPTION && (this.use_same_password || !this.installer.ENCRYPTION_PASSWORD)) {
+        this.installer.ENCRYPTION_PASSWORD = this.user_password;
+      }
+      
       if(this.installer["NVIDIA_PACKAGE"] !== " ") {
         // we received a package name from the back-end, nothing to do here
       } else if(this.want_nvidia) {
@@ -281,6 +327,40 @@ export default {
             throw Error(error);
           });
     },
+    
+    updatePasswordsFromMain() {
+      if (this.use_same_password && this.user_password) {
+        this.installer.USER_PASSWORD = this.user_password;
+        this.installer.ROOT_PASSWORD = this.user_password;
+        if (this.installer.ENABLE_ENCRYPTION) {
+          this.installer.ENCRYPTION_PASSWORD = this.user_password;
+        }
+      }
+    },
+    
+    toggleSamePassword() {
+      if (this.use_same_password) {
+        this.updatePasswordsFromMain();
+      }
+    }
+  },
+  
+  watch: {
+    user_password() {
+      if (this.use_same_password) {
+        this.updatePasswordsFromMain();
+      }
+    },
+    
+    use_same_password() {
+      this.toggleSamePassword();
+    },
+    
+    'installer.ENABLE_ENCRYPTION'() {
+      if (this.use_same_password) {
+        this.updatePasswordsFromMain();
+      }
+    }
   }
 }
 </script>
@@ -339,17 +419,32 @@ export default {
       </fieldset>
 
       <fieldset>
-        <legend>Root User</legend>
-        <Password v-model="installer.ROOT_PASSWORD" :disabled="running" />
+        <legend>Password Setup</legend>
+        <label for="user_password">Password</label>
+        <input type="password" id="user_password" v-model="user_password" :disabled="running" placeholder="Enter password">
+        
+        <label for="user_password_confirm">Confirm Password</label>
+        <input type="password" id="user_password_confirm" v-model="user_password_confirm" :disabled="running" placeholder="Confirm password">
+        
+        <div v-if="user_password && !passwords_match" class="password-error">
+          Passwords do not match!
+        </div>
+        
+        <br>
+        <input type="checkbox" v-model="use_same_password" id="use_same_password" class="inline mt-3" :disabled="running">
+        <label for="use_same_password" class="inline mt-3">Use same password for everything (user, root, and encryption if enabled)</label>
       </fieldset>
 
       <fieldset>
-        <legend>Regular User</legend>
+        <legend>User Account</legend>
         <label for="USERNAME">User Name</label>
         <input type="text" id="USERNAME" v-model="installer.USERNAME" :disabled="running">
         <label for="full_name">Full Name</label>
         <input type="text" id="USER_FULL_NAME" v-model="installer.USER_FULL_NAME" :disabled="running">
-        <Password v-model="installer.USER_PASSWORD" :disabled="running" />
+        
+        <br>
+        <input type="checkbox" v-model="installer.ENABLE_SUDO" id="ENABLE_SUDO" class="inline mt-3" :disabled="running">
+        <label for="ENABLE_SUDO" class="inline mt-3">Add user to sudo group (allows admin access)</label>
       </fieldset>
 
       <fieldset>
@@ -513,6 +608,16 @@ label:not(.inline) {
   color: #666;
   font-style: italic;
   margin-top: 4px;
+  font-size: 0.9em;
+}
+
+.password-error {
+  background-color: #ffebee;
+  border: 1px solid #f44336;
+  border-radius: 4px;
+  padding: 8px;
+  margin: 4px 0;
+  color: #c62828;
   font-size: 0.9em;
 }
 

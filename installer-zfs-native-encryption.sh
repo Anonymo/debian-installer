@@ -15,6 +15,7 @@ SWAP_SIZE=2
 NVIDIA_PACKAGE=
 ENABLE_POPCON=false
 ENABLE_UBUNTU_THEME=false
+ENABLE_SUDO=false
 SSH_PUBLIC_KEY=
 AFTER_INSTALLED_CMD=
 fi
@@ -333,7 +334,11 @@ chmod +x ${target}/etc/kernel/postinst.d/zz-update-systemd-boot || exit 1
 
 # Configure users
 notify configure users
-chroot ${target} useradd -m -s /bin/bash -G sudo ${USERNAME} || exit 1
+if [ "${ENABLE_SUDO}" == "true" ]; then
+    chroot ${target} useradd -m -s /bin/bash -G sudo ${USERNAME} || exit 1
+else
+    chroot ${target} useradd -m -s /bin/bash ${USERNAME} || exit 1
+fi
 echo "${USERNAME}:${USER_PASSWORD}" | chroot ${target} chpasswd || exit 1
 echo "root:${ROOT_PASSWORD}" | chroot ${target} chpasswd || exit 1
 
