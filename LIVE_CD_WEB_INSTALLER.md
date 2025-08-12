@@ -21,11 +21,16 @@ Download from: https://cdimage.debian.org/cdimage/weekly-live-builds/amd64/iso-h
 #### 2. Boot and Install Dependencies
 Boot the Live CD and open a terminal:
 ```bash
-# Enable non-free-firmware repository (skip cdrom and first line)
-sudo sed -i '2,$ {/^deb cdrom/! s/ main$/ main non-free-firmware/}' /etc/apt/sources.list
+# Enable non-free-firmware repository (skip cdrom lines)
+sudo awk '/^deb cdrom/ {print; next} /main$/ {gsub(/main$/, "main non-free-firmware")} {print}' /etc/apt/sources.list > /tmp/sources.list.tmp && sudo mv /tmp/sources.list.tmp /etc/apt/sources.list
 
 # Install required packages
 sudo apt update
+
+# Stop conflicting services if running
+sudo systemctl stop bind9 2>/dev/null || true
+sudo systemctl stop named 2>/dev/null || true
+
 sudo apt install -y git golang-go npm zfsutils-linux debootstrap
 
 # Clone the installer

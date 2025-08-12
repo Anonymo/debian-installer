@@ -7,14 +7,19 @@ set -e
 echo "=== Debian Installer Quick Setup for Live CD ==="
 echo ""
 
-# Enable non-free-firmware repository (skip cdrom and first line)
+# Enable non-free-firmware repository (skip cdrom lines)
 echo "→ Enabling non-free-firmware repository..."
-# Skip first line and cdrom lines, add non-free-firmware to others ending with 'main'
-sudo sed -i '2,$ {/^deb cdrom/! s/ main$/ main non-free-firmware/}' /etc/apt/sources.list 2>/dev/null || true
+# Skip cdrom lines, add non-free-firmware to others ending with 'main'
+sudo awk '/^deb cdrom/ {print; next} /main$/ {gsub(/main$/, "main non-free-firmware")} {print}' /etc/apt/sources.list > /tmp/sources.list.tmp && sudo mv /tmp/sources.list.tmp /etc/apt/sources.list 2>/dev/null || true
 
 # Update package lists
 echo "→ Updating package lists..."
 sudo apt update
+
+# Stop bind/named if running (can conflict with installation)
+echo "→ Stopping conflicting services..."
+sudo systemctl stop bind9 2>/dev/null || true
+sudo systemctl stop named 2>/dev/null || true
 
 # Install minimal dependencies to download and run pre-built binary
 echo "→ Installing minimal dependencies..."
