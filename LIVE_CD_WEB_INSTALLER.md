@@ -12,6 +12,10 @@ Download from: https://cdimage.debian.org/cdimage/weekly-live-builds/amd64/iso-h
 ### 2. Boot and Install Dependencies
 Boot the Live CD and open a terminal:
 ```bash
+# Enable non-free and contrib repositories
+sudo sed -i 's/main/main contrib non-free non-free-firmware/g' /etc/apt/sources.list
+sudo sed -i 's/main/main contrib non-free non-free-firmware/g' /etc/apt/sources.list.d/*.sources 2>/dev/null || true
+
 # Install required packages
 sudo apt update
 sudo apt install -y git golang-go npm zfsutils-linux debootstrap
