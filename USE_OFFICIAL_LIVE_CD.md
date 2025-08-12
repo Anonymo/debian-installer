@@ -26,8 +26,8 @@ This guide explains how to use the official Debian Trixie GNOME Live CD with thi
 ### 2. Prepare the Environment
 Open a terminal and run:
 ```bash
-# Enable contrib and non-free repositories (skip first line and deb-src lines)
-sudo awk 'NR==1 {print; next} /^deb-src/ {print; next} /^deb / && /main$/ {gsub(/main$/, "main contrib non-free non-free-firmware")} {print}' /etc/apt/sources.list > /tmp/sources.list.tmp && sudo mv /tmp/sources.list.tmp /etc/apt/sources.list
+# Enable contrib and non-free repositories (skip first line with /run/live/medium)
+sudo awk 'NR==1 {print; next} (/^deb / || /^deb-src /) && /main$/ {gsub(/main$/, "main contrib non-free non-free-firmware")} {print}' /etc/apt/sources.list > /tmp/sources.list.tmp && sudo mv /tmp/sources.list.tmp /etc/apt/sources.list
 
 # Update package lists
 sudo apt update

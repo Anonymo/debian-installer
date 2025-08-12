@@ -7,10 +7,12 @@ set -e
 echo "=== Debian Installer Quick Setup for Live CD ==="
 echo ""
 
-# Enable contrib and non-free repositories (skip first line and deb-src lines)
+# Enable contrib and non-free repositories (skip first line with /run/live/medium)
 echo "→ Enabling contrib and non-free repositories..."
-# Skip first line, only modify 'deb' lines (not deb-src), add contrib non-free non-free-firmware
-sudo awk 'NR==1 {print; next} /^deb-src/ {print; next} /^deb / && /main$/ {gsub(/main$/, "main contrib non-free non-free-firmware")} {print}' /etc/apt/sources.list > /tmp/sources.list.tmp && sudo mv /tmp/sources.list.tmp /etc/apt/sources.list 2>/dev/null || true
+# Modify existing sources.list to add contrib and non-free 
+sudo sed -i '/^deb http.*debian.*trixie.*main$/s/main$/main contrib non-free/' /etc/apt/sources.list
+sudo sed -i '/^deb-src http.*debian.*trixie.*main$/s/main$/main contrib non-free/' /etc/apt/sources.list
+sudo sed -i '/^deb http.*security.*trixie-security.*main$/s/main$/main contrib non-free/' /etc/apt/sources.list
 
 # Update package lists
 echo "→ Updating package lists..."
@@ -23,7 +25,9 @@ sudo systemctl stop named 2>/dev/null || true
 
 # Install dependencies including ZFS support
 echo "→ Installing dependencies including ZFS support..."
-sudo apt install -y curl git zfsutils-linux zfs-dkms debootstrap linux-headers-$(uname -r)
+export DEBIAN_FRONTEND=noninteractive
+echo 'zfs-dkms zfs-dkms/note-incompatible-licenses note true' | sudo debconf-set-selections
+sudo -E apt install -y curl git zfsutils-linux zfs-dkms debootstrap linux-headers-$(uname -r)
 
 # Load ZFS kernel module
 echo "→ Loading ZFS kernel module..."

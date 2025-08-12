@@ -22,8 +22,8 @@ Download from: https://cdimage.debian.org/cdimage/weekly-live-builds/amd64/iso-h
 #### 2. Boot and Install Dependencies
 Boot the Live CD and open a terminal:
 ```bash
-# Enable contrib and non-free repositories (skip first line and deb-src lines)
-sudo awk 'NR==1 {print; next} /^deb-src/ {print; next} /^deb / && /main$/ {gsub(/main$/, "main contrib non-free non-free-firmware")} {print}' /etc/apt/sources.list > /tmp/sources.list.tmp && sudo mv /tmp/sources.list.tmp /etc/apt/sources.list
+# Enable contrib and non-free repositories (skip first line with /run/live/medium)
+sudo awk 'NR==1 {print; next} (/^deb / || /^deb-src /) && /main$/ {gsub(/main$/, "main contrib non-free non-free-firmware")} {print}' /etc/apt/sources.list > /tmp/sources.list.tmp && sudo mv /tmp/sources.list.tmp /etc/apt/sources.list
 
 # Install required packages
 sudo apt update
