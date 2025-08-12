@@ -14,6 +14,10 @@ func (c *BackendContext) Login(w http.ResponseWriter, _ *http.Request) {
 		Hostname         string            `json:"hostname"`
 		HasEfi           bool              `json:"has_efi"`
 		HasNvidia        bool              `json:"has_nvidia"`
+		HasAMDGPU        bool              `json:"has_amd_gpu"`
+		WiFiChipset      string            `json:"wifi_chipset"`
+		StorageType      string            `json:"storage_type"`
+		TPMVersion       string            `json:"tpm_version"`
 		Running          bool              `json:"running"`
 		Environ          map[string]string `json:"environ"`
 		RamGB            int               `json:"ram_gb"`
@@ -38,6 +42,10 @@ func (c *BackendContext) Login(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	data.HasNvidia = detectNvidia()
+	data.HasAMDGPU = detectAMDGPU()
+	data.WiFiChipset = detectWiFiChipset()
+	data.StorageType = detectStorageType()
+	data.TPMVersion = detectTPMVersion()
 	data.Running = c.runningCmd != nil && c.runningCmd.Process != nil
 	data.Environ = c.runningParameters
 	data.RamGB = detectRAM()
@@ -64,6 +72,70 @@ func detectNvidia() bool {
 		return true
 	}
 	return false
+}
+
+func detectAMDGPU() bool {
+	out, err := runAndGiveStdout("lspci")
+	if err != nil {
+		slog.Warn("failed to run lspci, assuming no AMD GPU", "error", err)
+		return false
+	}
+	outString := string(out)
+	return strings.Contains(outString, "AMD") && (strings.Contains(outString, "VGA") || strings.Contains(outString, "Display"))
+}
+
+func detectWiFiChipset() string {
+	out, err := runAndGiveStdout("lspci")
+	if err != nil {
+		slog.Warn("failed to run lspci for WiFi detection", "error", err)
+		return ""
+	}
+	outString := string(out)
+	
+	// Common WiFi chipsets that need firmware
+	if strings.Contains(outString, "Broadcom") && strings.Contains(outString, "Wireless") {
+		return "broadcom"
+	}
+	if strings.Contains(outString, "Intel") && strings.Contains(outString, "Wireless") {
+		return "intel"
+	}
+	if strings.Contains(outString, "Realtek") && strings.Contains(outString, "Wireless") {
+		return "realtek"
+	}
+	if strings.Contains(outString, "Atheros") && strings.Contains(outString, "Wireless") {
+		return "atheros"
+	}
+	
+	return ""
+}
+
+func detectStorageType() string {
+	// Check if we have NVMe drives
+	if _, err := os.Stat("/dev/nvme0n1"); err == nil {
+		return "nvme"
+	}
+	
+	// Check for typical SSD indicators
+	out, err := runAndGiveStdout("lsblk", "-d", "-o", "name,rota")
+	if err == nil && strings.Contains(string(out), "0") {
+		return "ssd"
+	}
+	
+	return "hdd"
+}
+
+func detectTPMVersion() string {
+	// Check for TPM 2.0
+	if _, err := os.Stat("/dev/tpmrm0"); err == nil {
+		return "2.0"
+	}
+	
+	// Check for TPM 1.2
+	if _, err := os.Stat("/dev/tpm0"); err == nil {
+		return "1.2"
+	}
+	
+	return "none"
 }
 
 func (c *BackendContext) GetBlockDevices(w http.ResponseWriter, _ *http.Request) {

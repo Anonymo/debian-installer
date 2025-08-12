@@ -17,15 +17,28 @@ ENABLE_POPCON=false
 ENABLE_UBUNTU_THEME=false
 ENABLE_SUDO=false
 DISABLE_ROOT=false
+DESKTOP_ENVIRONMENT=gnome
+ENABLE_FLATPAK=false
+ENABLE_DEV_TOOLS=false
 SSH_PUBLIC_KEY=
 AFTER_INSTALLED_CMD=
 fi
 
 function notify () {
-    echo $@
+    echo "==> $@"
     if [ -z "${NON_INTERACTIVE}" ]; then
       read -p "Enter to continue"
     fi
+}
+
+function progress () {
+    local step=$1
+    local total=$2
+    local message=$3
+    local percent=$((step * 100 / total))
+    echo ""
+    echo "Progress: [$step/$total] ($percent%) - $message"
+    echo "----------------------------------------"
 }
 
 DEBIAN_VERSION=trixie
@@ -34,33 +47,133 @@ BACKPORTS_VERSION=${DEBIAN_VERSION}  # TODO append "-backports" when available
 TPM_PCRS="7+14"
 # do not enable this on a live-cd
 SHARE_APT_ARCHIVE=false
-FSFLAGS="compress=zstd:1"
+# Will be set based on hardware detection
+FSFLAGS=""
 DEBIAN_FRONTEND=noninteractive
 export DEBIAN_FRONTEND
 
-if [ "$(id -u)" -ne 0 ]; then
-    echo 'This script must be run by root' >&2
-    exit 1
-fi
+# Hardware detection and optimization
+function detect_hardware_and_optimize() {
+    echo "Detecting hardware and optimizing ZFS settings..."
+    
+    # Detect storage type
+    STORAGE_TYPE="hdd"
+    if [ -e /dev/nvme0n1 ]; then
+        STORAGE_TYPE="nvme"
+    elif lsblk -d -o name,rota | grep -q "0"; then
+        STORAGE_TYPE="ssd"
+    fi
+    echo "Detected storage type: ${STORAGE_TYPE}"
+    
+    # Detect RAM amount for ZFS ARC optimization
+    RAM_MB=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+    RAM_GB=$((RAM_MB / 1024 / 1024))
+    echo "Detected RAM: ${RAM_GB}GB"
+    
+    # Set ZFS flags based on hardware
+    case "${STORAGE_TYPE}" in
+        "nvme"|"ssd")
+            # Optimize for SSDs - use lz4 compression, larger recordsize
+            FSFLAGS="compress=lz4,recordsize=1M,atime=off"
+            ZFS_ARC_MAX=$((RAM_MB * 1024 / 2))  # Use half of RAM for ARC on SSDs
+            ;;
+        "hdd")
+            # Optimize for HDDs - use zstd compression, smaller recordsize
+            FSFLAGS="compress=zstd:3,recordsize=128K,atime=off"
+            ZFS_ARC_MAX=$((RAM_MB * 1024 / 4))  # Use quarter of RAM for ARC on HDDs
+            ;;
+    esac
+    
+    # Don't use more than 8GB for ARC to leave memory for system
+    MAX_ARC=$((8 * 1024 * 1024 * 1024))
+    if [ ${ZFS_ARC_MAX} -gt ${MAX_ARC} ]; then
+        ZFS_ARC_MAX=${MAX_ARC}
+    fi
+    
+    echo "ZFS flags: ${FSFLAGS}"
+    echo "ZFS ARC max: $((ZFS_ARC_MAX / 1024 / 1024 / 1024))GB"
+    
+    # Export for use in the script
+    export FSFLAGS ZFS_ARC_MAX STORAGE_TYPE
+}
 
-if [ -z "${DISK}" ]; then
-    echo "DISK variable is missing" >&2
-    exit 2
-fi
+# Run hardware detection
+detect_hardware_and_optimize
 
-if [ "${ENABLE_ENCRYPTION}" == "true" ]; then
-  if [ -z "${ENCRYPTION_PASSWORD}" ]; then
-      echo "ENCRYPTION_PASSWORD variable is missing" >&2
-      exit 3
-  fi
-fi
+# Validation and error checking functions
+function validate_system() {
+    echo "Performing system validation..."
+    
+    # Check if running as root
+    if [ "$(id -u)" -ne 0 ]; then
+        echo 'ERROR: This script must be run by root' >&2
+        exit 1
+    fi
+    
+    # Validate disk exists and is not mounted
+    if [ ! -e "${DISK}" ]; then
+        echo "ERROR: Disk ${DISK} does not exist" >&2
+        exit 2
+    fi
+    
+    # Check if disk is mounted
+    if mount | grep -q "${DISK}"; then
+        echo "ERROR: Disk ${DISK} or its partitions are currently mounted" >&2
+        echo "Please unmount all partitions on ${DISK} before continuing" >&2
+        exit 3
+    fi
+    
+    # Check available disk space (minimum 20GB)
+    DISK_SIZE=$(lsblk -b -d -o SIZE "${DISK}" | tail -n1)
+    MIN_SIZE=$((20 * 1024 * 1024 * 1024))  # 20GB in bytes
+    if [ "${DISK_SIZE}" -lt "${MIN_SIZE}" ]; then
+        echo "ERROR: Disk ${DISK} is too small (${DISK_SIZE} bytes). Minimum 20GB required." >&2
+        exit 4
+    fi
+    
+    # Check internet connectivity for package downloads
+    if ! ping -c 1 deb.debian.org >/dev/null 2>&1; then
+        echo "WARNING: No internet connectivity detected. Installation may fail during package downloads." >&2
+        echo "Press Enter to continue anyway or Ctrl+C to abort..."
+        if [ -z "${NON_INTERACTIVE}" ]; then
+            read
+        fi
+    fi
+    
+    # Validate required variables
+    if [ -z "${USERNAME}" ] || [ -z "${USER_PASSWORD}" ] || [ -z "${HOSTNAME}" ]; then
+        echo "ERROR: Required variables not set (USERNAME, USER_PASSWORD, HOSTNAME)" >&2
+        exit 5
+    fi
+    
+    # Validate encryption settings
+    if [ "${ENABLE_ENCRYPTION}" == "true" ] && [ -z "${ENCRYPTION_PASSWORD}" ]; then
+        echo "ERROR: Encryption enabled but no encryption password provided" >&2
+        exit 6
+    fi
+    
+    # Check if sudo is enabled when root is disabled
+    if [ "${DISABLE_ROOT}" == "true" ] && [ "${ENABLE_SUDO}" != "true" ]; then
+        echo "ERROR: Cannot disable root account without enabling sudo for user" >&2
+        exit 7
+    fi
+    
+    echo "System validation completed successfully"
+}
+
+# Run system validation
+progress 1 12 "Validating system and detecting hardware"
+validate_system
+
 
 if [ -z "${NON_INTERACTIVE}" ]; then
+    progress 2 12 "Installing required packages"
     notify install required packages
     apt-get update -y  || exit 1
     apt-get install -y debootstrap uuid-runtime zfsutils-linux dosfstools git || exit 1
 fi
 
+progress 3 12 "Preparing disk partitions"
 if [ ! -f efi-part.uuid ]; then
     notify generate uuid for efi partition
     uuidgen > efi-part.uuid || exit 1
@@ -131,6 +244,7 @@ else
         notify create ZFS pool on ${root_device}
         wipefs -a ${root_device} || exit 1
         
+        progress 4 12 "Creating ZFS pool and datasets"
         # Create ZFS pool with optional native encryption
         if [ "${ENABLE_ENCRYPTION}" == "true" ]; then
             notify "Creating encrypted ZFS pool"
@@ -149,6 +263,10 @@ else
                 -O dnodesize=auto -O relatime=on \
                 ${zpool_name} ${root_device} || exit 1
         fi
+        
+        # Configure ZFS ARC based on detected hardware
+        notify "Configuring ZFS ARC for optimal performance"
+        echo "${ZFS_ARC_MAX}" > /sys/module/zfs/parameters/zfs_arc_max || true
         touch zfs_created.txt
     fi
 fi
@@ -216,6 +334,7 @@ if [ ${SWAP_SIZE} -gt 0 ]; then
     kernel_params="${kernel_params} resume=/dev/zvol/${zpool_name}/swap"
 fi
 
+progress 5 12 "Installing base Debian system with debootstrap"
 if [ ! -f ${target}/etc/debian_version ]; then
     notify install debian on ${target}
     debootstrap ${DEBIAN_VERSION} ${target} http://deb.debian.org/debian || exit 1
@@ -270,6 +389,65 @@ chroot ${target} apt-get install -y \
     zfsutils-linux zfs-dkms zfs-initramfs \
     systemd-boot dracut network-manager sudo \
     locales console-setup keyboard-configuration || exit 1
+
+# Configure ZFS module parameters for optimal performance
+notify "Configuring ZFS module parameters"
+mkdir -p ${target}/etc/modprobe.d || exit 1
+cat > ${target}/etc/modprobe.d/zfs.conf <<EOF
+# ZFS module configuration optimized for detected hardware
+# Storage type: ${STORAGE_TYPE}
+# RAM: ${RAM_GB}GB
+
+# Set ARC maximum size (in bytes)
+options zfs zfs_arc_max=${ZFS_ARC_MAX}
+
+# Enable automatic TRIM for SSDs
+EOF
+
+if [ "${STORAGE_TYPE}" = "nvme" ] || [ "${STORAGE_TYPE}" = "ssd" ]; then
+    echo "options zfs zfs_trim_standard_disks=1" >> ${target}/etc/modprobe.d/zfs.conf
+fi
+
+# Add ZFS optimization sysctls
+cat > ${target}/etc/sysctl.d/90-zfs.conf <<EOF
+# ZFS optimization settings
+# Increase dirty data limits for better write performance
+vm.dirty_ratio = 80
+vm.dirty_background_ratio = 5
+
+# Optimize for ${STORAGE_TYPE} storage
+EOF
+
+if [ "${STORAGE_TYPE}" = "nvme" ] || [ "${STORAGE_TYPE}" = "ssd" ]; then
+    echo "# SSD optimizations" >> ${target}/etc/sysctl.d/90-zfs.conf
+    echo "vm.swappiness = 1" >> ${target}/etc/sysctl.d/90-zfs.conf
+else
+    echo "# HDD optimizations" >> ${target}/etc/sysctl.d/90-zfs.conf
+    echo "vm.swappiness = 10" >> ${target}/etc/sysctl.d/90-zfs.conf
+fi
+
+# Install desktop environment
+notify "Installing desktop environment: ${DESKTOP_ENVIRONMENT}"
+case "${DESKTOP_ENVIRONMENT}" in
+    "gnome")
+        chroot ${target} apt-get install -y task-gnome-desktop gnome-session gdm3 || exit 1
+        ;;
+    "kde")
+        chroot ${target} apt-get install -y task-kde-desktop plasma-desktop sddm || exit 1
+        chroot ${target} systemctl enable sddm || exit 1
+        ;;
+    "xfce")
+        chroot ${target} apt-get install -y task-xfce-desktop lightdm lightdm-gtk-greeter || exit 1
+        chroot ${target} systemctl enable lightdm || exit 1
+        ;;
+    "minimal")
+        echo "Minimal installation - no desktop environment"
+        ;;
+    *)
+        echo "Unknown desktop environment: ${DESKTOP_ENVIRONMENT}, defaulting to GNOME"
+        chroot ${target} apt-get install -y task-gnome-desktop gnome-session gdm3 || exit 1
+        ;;
+esac
 
 # Configure ZFS for boot
 notify configure ZFS for boot
@@ -389,6 +567,7 @@ notify export ZFS pool
 zfs umount -a || exit 1
 zpool export ${zpool_name} || exit 1
 
+progress 12 12 "Installation completed successfully!"
 notify "Installation complete!"
 echo "Remove installation media and reboot"
 
@@ -428,6 +607,56 @@ if [ ! -f "$HOME/.ubuntu-theme-applied" ]; then
 fi
 EOTHEME
     chmod +x ${target}/etc/profile.d/ubuntu-theme-setup.sh
+fi
+
+# Install Flatpak if requested
+if [ "${ENABLE_FLATPAK}" == "true" ]; then
+    notify "Installing Flatpak"
+    chroot ${target} apt-get install -y flatpak || exit 1
+    if [ "${DESKTOP_ENVIRONMENT}" != "minimal" ]; then
+        # Add Flathub repository
+        chroot ${target} flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo || true
+        
+        # Install appropriate plugin for desktop environment
+        case "${DESKTOP_ENVIRONMENT}" in
+            "gnome")
+                chroot ${target} apt-get install -y gnome-software-plugin-flatpak || true
+                ;;
+            "kde")
+                chroot ${target} apt-get install -y plasma-discover-backend-flatpak || true
+                ;;
+        esac
+    fi
+fi
+
+# Install development tools if requested
+if [ "${ENABLE_DEV_TOOLS}" == "true" ]; then
+    notify "Installing development tools"
+    chroot ${target} apt-get install -y \
+        git build-essential curl wget \
+        python3-pip nodejs npm \
+        default-jdk maven gradle \
+        docker.io docker-compose \
+        vim neovim emacs-nox || exit 1
+    
+    # Add user to docker group if sudo is enabled
+    if [ "${ENABLE_SUDO}" == "true" ]; then
+        chroot ${target} usermod -aG docker ${USERNAME} || true
+    fi
+    
+    # Install VS Code
+    chroot ${target} bash -c "
+        curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /etc/apt/trusted.gpg.d/microsoft.gpg
+        echo 'deb [arch=amd64,arm64,armhf signed-by=/etc/apt/trusted.gpg.d/microsoft.gpg] https://packages.microsoft.com/repos/code stable main' > /etc/apt/sources.list.d/vscode.list
+        apt-get update
+        apt-get install -y code || true
+    " || true
+    
+    # Configure Git for user (basic setup)
+    chroot ${target} su - ${USERNAME} -c "
+        git config --global init.defaultBranch main
+        git config --global pull.rebase false
+    " || true
 fi
 
 if [ -n "${AFTER_INSTALLED_CMD}" ]; then

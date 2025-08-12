@@ -10,8 +10,11 @@ Our opinions of what a modern installation of Debian should look like in 2025 ar
  - Firmware installed
  - Installed on ZFS datasets with boot environment management via zectl
  - Optional ZFS native encryption (AES-256-GCM)
- - Fast installation using an image
- - Browser-based installer
+ - Multiple desktop environment options (GNOME, KDE, XFCE, or minimal)
+ - Hardware-optimized ZFS performance settings
+ - Automatic driver detection and installation
+ - Optional development tools and Flatpak support
+ - Browser-based installer with comprehensive validation
   
 ## Limitations
 
@@ -31,7 +34,11 @@ Our opinions of what a modern installation of Debian should look like in 2025 ar
    curl -L https://raw.githubusercontent.com/Anonymo/debian-installer/master/livecd-quick-install.sh | bash
    ```
 3. Browser will automatically open to `http://localhost:5000/`
-4. Fill out all required fields in the form (all fields must be filled for Install button to activate)
+4. Fill out all required fields in the form:
+   - Select target disk and desktop environment
+   - Configure user account and passwords  
+   - Choose optional features (encryption, development tools, Flatpak, etc.)
+   - All required fields must be filled for Install button to activate
 5. Or follow the manual steps in [LIVE_CD_WEB_INSTALLER.md](LIVE_CD_WEB_INSTALLER.md)
 
 ### Method 2: Manual Installation with Script
@@ -60,13 +67,29 @@ For advanced users who prefer command-line installation:
   - `rpool/home` for `/home`
   - `rpool/swap` for swap (zvol)
 
+### Desktop Environment Options
+- **GNOME** (default) - Full GNOME desktop with GDM
+- **KDE Plasma** - Modern KDE desktop with SDDM
+- **XFCE** - Lightweight desktop with LightDM
+- **Minimal** - Command-line only installation
+
+### Hardware Detection & Optimization
+- **Automatic driver detection** for NVIDIA/AMD graphics and WiFi chipsets
+- **Storage-optimized ZFS settings** based on detected hardware (NVMe/SSD/HDD)
+- **Dynamic ZFS ARC sizing** based on available RAM
+- **TPM detection** with compatibility warnings for older hardware
+- **Intelligent compression** selection (LZ4 for SSDs, ZSTD for HDDs)
+
 ### Ubuntu-Like Theme Option
-- **NEW**: Optional Ubuntu-like appearance with Yaru theme
+- Optional Ubuntu-like appearance with Yaru theme (GNOME only)
 - Installs Yaru theme packages, Ubuntu fonts, and GNOME extensions
 - Configures dash-to-dock, app indicators, and desktop icons
 - Applies automatically on first login after installation
-- Native ZFS compression (LZ4) and optimization
-- ZFS TRIM support for SSDs
+
+### Development Tools & Software
+- **Optional development environment** with Git, VS Code, Docker, build tools
+- **Flatpak support** with desktop environment integration
+- **Comprehensive package selection** including Python, Node.js, Java tools
 
 ### Boot Environment Management with zectl
 - Integrated [zectl](https://github.com/johnramsden/zectl) for managing boot environments
@@ -80,16 +103,24 @@ For advanced users who prefer command-line installation:
 - No additional encryption layers needed
 - Password prompt at boot for ZFS native encryption
 
-### Additional Features
-- Automatic ZFS module installation and configuration
-- ZFS-optimized kernel parameters
-- Boot environment snapshots for safe system updates
-- APT hook for automatic boot environment creation before upgrades
-- Web-based installer interface - no manual configuration needed
+### Installation Features
+- **Comprehensive validation** - disk space, connectivity, configuration checks
+- **Progress indicators** - real-time installation progress with 12 distinct phases
+- **Error handling** - detailed error messages with exit codes for troubleshooting
+- **Hardware-aware configuration** - automatic optimization based on detected hardware
+- **Rollback capability** - ZFS boot environments for safe system recovery
 
 ## Installation Result
 
-After installation, you'll have:
+After installation, you'll have a fully optimized Debian system with:
+
+- **Your chosen desktop environment** - GNOME, KDE, XFCE, or minimal CLI
+- **ZFS root filesystem** with hardware-optimized settings and compression
+- **Boot environment management** - automatic snapshots before updates with rollback capability
+- **Modern boot setup** - systemd-boot with dracut instead of legacy GRUB/initramfs
+- **Optional encryption** - ZFS native encryption with boot-time password prompt
+- **Development ready** - optional VS Code, Docker, Git, and modern development tools
+- **Software flexibility** - Flatpak support for additional applications
 
 ## Details
 

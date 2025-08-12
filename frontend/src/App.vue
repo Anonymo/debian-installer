@@ -43,6 +43,9 @@ export default {
         ENABLE_UBUNTU_THEME: false,
         ENABLE_SUDO: false,
         DISABLE_ROOT: false,
+        DESKTOP_ENVIRONMENT: "gnome",
+        ENABLE_FLATPAK: false,
+        ENABLE_DEV_TOOLS: false,
         SSH_PUBLIC_KEY: undefined,
         AFTER_INSTALLED_CMD: undefined,
       }
@@ -75,8 +78,8 @@ export default {
         if(key === "NVIDIA_PACKAGE") {
           continue; // Optional
         }
-        if(key === "ENABLE_UBUNTU_THEME" || key === "ENABLE_POPCON" || key === "ENABLE_TPM" || key === "ENABLE_SUDO" || key === "DISABLE_ROOT") {
-          continue; // Optional checkboxes
+        if(key === "ENABLE_UBUNTU_THEME" || key === "ENABLE_POPCON" || key === "ENABLE_TPM" || key === "ENABLE_SUDO" || key === "DISABLE_ROOT" || key === "DESKTOP_ENVIRONMENT" || key === "ENABLE_FLATPAK" || key === "ENABLE_DEV_TOOLS") {
+          continue; // Optional checkboxes and dropdown
         }
         if(typeof value === 'undefined' || value === null || value === "") {
           if(key !== "SSH_PUBLIC_KEY" && key !== "AFTER_INSTALLED_CMD") {
@@ -494,8 +497,25 @@ export default {
         <label for="ENABLE_POPCON" class="inline mt-3">Participate in the <a href="https://popcon.debian.org/" target="_blank">debian package usage survey</a></label>
 
         <br>
-        <input type="checkbox" v-model="installer.ENABLE_UBUNTU_THEME" id="ENABLE_UBUNTU_THEME" class="inline mt-3" :disabled="running">
-        <label for="ENABLE_UBUNTU_THEME" class="inline mt-3">Apply Ubuntu-like theme (Yaru theme, fonts, and GNOME extensions)</label>
+        <label for="DESKTOP_ENVIRONMENT">Desktop Environment:</label>
+        <select v-model="installer.DESKTOP_ENVIRONMENT" id="DESKTOP_ENVIRONMENT" :disabled="running">
+          <option value="gnome">GNOME (Default)</option>
+          <option value="kde">KDE Plasma</option>
+          <option value="xfce">XFCE</option>
+          <option value="minimal">Minimal (No GUI)</option>
+        </select>
+
+        <br>
+        <input type="checkbox" v-model="installer.ENABLE_UBUNTU_THEME" id="ENABLE_UBUNTU_THEME" class="inline mt-3" :disabled="running || installer.DESKTOP_ENVIRONMENT !== 'gnome'">
+        <label for="ENABLE_UBUNTU_THEME" class="inline mt-3">Apply Ubuntu-like theme (Yaru theme, fonts, and GNOME extensions) - GNOME only</label>
+
+        <br>
+        <input type="checkbox" v-model="installer.ENABLE_FLATPAK" id="ENABLE_FLATPAK" class="inline mt-3" :disabled="running">
+        <label for="ENABLE_FLATPAK" class="inline mt-3">Install Flatpak for additional software</label>
+
+        <br>
+        <input type="checkbox" v-model="installer.ENABLE_DEV_TOOLS" id="ENABLE_DEV_TOOLS" class="inline mt-3" :disabled="running">
+        <label for="ENABLE_DEV_TOOLS" class="inline mt-3">Install development tools (Git, build-essential, VS Code, Docker)</label>
       </fieldset>
 
       <fieldset>
