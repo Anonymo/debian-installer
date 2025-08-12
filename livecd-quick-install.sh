@@ -54,7 +54,18 @@ fi
 # Run the installer
 echo ""
 echo "=== Starting Web Installer ==="
-echo "→ Open your browser and navigate to: http://localhost:5000/"
+echo "→ The installer will be available at: http://localhost:5000/"
+echo ""
+
+# Try to open Firefox automatically
+if command -v firefox &> /dev/null; then
+    echo "→ Opening Firefox browser..."
+    firefox http://localhost:5000/ &>/dev/null &
+    sleep 2
+else
+    echo "→ Please open your browser and navigate to: http://localhost:5000/"
+fi
+
 echo "→ Press Ctrl+C to stop the installer"
 echo ""
 
