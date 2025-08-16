@@ -197,6 +197,12 @@ pick_port() {
   echo "$p"
 }
 
+if [ "${FORCE_PORT:-0}" = "1" ]; then
+  echo "> FORCE_PORT set: attempting to free port ${PORT}"
+  try_stop_services
+  try_free_port "${PORT}"
+fi
+
 PORT="$(pick_port "${PORT}")"
 
 URL="http://localhost:${PORT}"
