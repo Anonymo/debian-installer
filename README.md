@@ -167,19 +167,26 @@ This ZFS fork uses the web-based installer interface. Configuration is done thro
 - Optional features (encryption, development tools, Flatpak)
 - Progress indicators during installation
 
-## Remote Installation
+## Advanced Options
 
-For headless/remote installation, modify the `livecd-quick-install.sh` script to bind to all interfaces:
+The `livecd-quick-install.sh` script provides flags to customize its behavior:
+
+-   `--remote`: Use this flag for headless or remote installations. It makes the web server listen on all network interfaces.
+-   `--no-browser`: Prevents the script from automatically opening a web browser after starting the server.
+-   `--branch <name>`: Clones a specific branch from the GitHub repository. Useful for testing development branches.
+-   `--help`: Displays a help message with these options.
+
+### Remote Installation Example
+
+To run the installer on a headless machine and access it from another computer on your network, run the script with the `--remote` and `--no-browser` flags:
 
 ```bash
-# In the script, change the backend startup line to:
-sudo INSTALLER_SCRIPT="$(pwd)/installer-zfs-native-encryption.sh" \
-     ./backend/opinionated-installer backend -listenPort 5000 -staticHtmlFolder "$(pwd)/frontend/dist"
+curl -L https://raw.githubusercontent.com/Anonymo/debian-installer/master/livecd-quick-install.sh | bash -s -- --remote --no-browser
 ```
 
-Then access from another machine: `http://<server-ip>:5000/`
+Then, on your other computer, open a web browser and navigate to `http://<server-ip>:5000`.
 
-**Warning**: No encryption/authentication - use only on trusted networks!
+**Warning**: The web interface has no encryption or authentication. Use this feature only on trusted private networks.
 
 ## Testing in Virtual Machines
 

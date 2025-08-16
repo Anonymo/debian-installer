@@ -456,12 +456,16 @@ touch ${target}/etc/zfs/zfs-list.cache/${zpool_name} || exit 1
 
 # Install and configure zectl
 notify "Installing zectl for boot environment management"
+chroot ${target} apt-get install -y build-essential cmake git || exit 1
 chroot ${target} bash -c "
 cd /tmp
 git clone https://github.com/johnramsden/zectl || exit 1
 cd zectl
-make install PREFIX=/usr || exit 1
-cd ..
+mkdir build && cd build || exit 1
+cmake .. -DCMAKE_INSTALL_PREFIX=/usr || exit 1
+make || exit 1
+make install || exit 1
+cd /tmp
 rm -rf zectl
 " || exit 1
 
