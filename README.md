@@ -1,5 +1,19 @@
 # Debian Btrfs Installer (Browser-based LiveCD)
 
+Start Here (TL;DR)
+- This installer ERASES the whole disk you select. Double‑check the drive.
+- Works from a standard Debian Live USB. No expert steps required.
+
+One‑liner (copy–paste in a Live USB terminal)
+```bash
+sudo bash -lc 'set -e; apt-get update -y; env DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates git wget curl xdg-utils nodejs npm golang-go; work=/opt/debian-installer && rm -rf "$work" && git clone -b btrfs https://github.com/Anonymo/debian-installer.git "$work"; cd "$work"; chmod +x run_livecd_installer.sh; ./run_livecd_installer.sh'
+```
+
+What happens next
+- A browser opens at `http://localhost:5000`
+- Pick your target disk, set passwords and options, click Install
+- Reboot when it finishes and remove the USB
+
 Browser-driven Debian installer optimized for Btrfs + TPM, to be run from a Debian Live USB/CD. This fork focuses on a simple browser UI that drives `installer.sh` — no CLI/TUI required.
 
 ## Requirements
