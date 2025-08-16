@@ -1,41 +1,30 @@
-# Debian Btrfs Installer with Snapper
+# Debian Btrfs Installer (Browser-based LiveCD)
 
-A modern Debian installer with enhanced Btrfs support and automatic snapshots using Snapper (openSUSE-style). Features a browser-based interface for easy installation directly from LiveCD.
+Browser-driven Debian installer optimized for Btrfs + TPM, to be run from a Debian Live USB/CD. This fork focuses on a simple browser UI that drives `installer.sh` — no CLI/TUI required.
 
-Our opinions of what a modern installation of Debian should look like in 2025 are:
+## Requirements
 
- - Debian 13 (Trixie)
- - Backports and non-free enabled
- - Firmware installed
- - Installed on Btrfs subvolumes with Snapper snapshots
- - Full disk encryption, unlocked by TPM
- - Enhanced systemd-boot with sdbootutil
- - Browser-based installer for LiveCD usage
-  
-## Limitations
+- UEFI boot (amd64)
+- Debian Live environment (recommended)
+- Internet access to fetch packages
 
- - **The installer will take over your whole disk**
- - Amd64 with EFI only
- - The installer is in english only
+## Quick Start (LiveCD)
 
-## Quick Installation from LiveCD
-
-This installer is designed to run directly from any Debian Live USB/CD without requiring pre-built installer images.
-
-### Method 1: From Debian Live USB/CD
-
-1. **Boot from a standard Debian Live USB/CD** (GNOME, KDE, or any desktop environment)
-2. **Open a terminal** and run:
+1. Boot a Debian Live USB/CD (UEFI)
+2. Open a terminal in this repo folder and run:
 
 ```bash
-git clone -b btrfs https://github.com/Anonymo/debian-installer.git
-cd debian-installer
-sudo ./livecd-setup.sh
+sudo ./run_livecd_installer.sh
 ```
 
-3. **Open the installer** by navigating to the desktop icon or visiting `http://localhost/opinionated-debian-installer/` in your browser
-4. **Fill in the installation form** and click the Install button
-5. **Reboot** when complete and enjoy your new system
+This installs any missing tools, builds the UI/backend if sources are present, starts the backend on `http://localhost:5000`, and opens your browser. Fill the form and click Install. The script runs `installer.sh` under the hood.
+
+## What It Installs
+
+- Debian 13 (Trixie) with backports and non-free firmware
+- Btrfs with subvolumes (`@`, `@home`; optional `@swap`) and optional Snapper
+- Full-disk LUKS with optional TPM2 auto-unlock
+- systemd-boot + dracut; NetworkManager
 
 ### Method 2: Build Your Own Installer Image (Advanced)
 

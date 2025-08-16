@@ -5,6 +5,7 @@ on:  [push, pull_request]
 jobs:
 
   build-backend:
+    if: ${{ hashFiles('frontend-tui/go.mod') != '' }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -12,7 +13,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24.3'
+        go-version: '1.22.x'
         cache-dependency-path: frontend-tui/go.sum
 
     - name: Test
@@ -34,6 +35,7 @@ jobs:
         path: frontend-tui/opinionated-installer
 
   build-web-gui:
+    if: ${{ hashFiles('frontend/package.json') != '' }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4

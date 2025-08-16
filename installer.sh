@@ -10,6 +10,7 @@ ROOT_PASSWORD=changeme
 LUKS_PASSWORD=luke
 ENABLE_TPM=true
 HOSTNAME=debian13
+TIMEZONE=UTC
 ENABLE_SWAP=partition
 SWAP_SIZE=2
 NVIDIA_PACKAGE=
@@ -26,7 +27,7 @@ function notify () {
 }
 
 DEBIAN_VERSION=trixie
-BACKPORTS_VERSION=${DEBIAN_VERSION}  # TODO append "-backports" when available
+BACKPORTS_VERSION=${DEBIAN_VERSION}-backports
 # see https://www.freedesktop.org/software/systemd/man/systemd-cryptenroll.html#--tpm2-pcrs=PCR
 TPM_PCRS="7+14"
 # do not enable this on a live-cd
@@ -80,7 +81,7 @@ fi
 
 root_part_type="4f68bce3-e8cd-4db1-96e7-fbcaf984b709"  # X86_64
 system_part_type="C12A7328-F81F-11D2-BA4B-00A0C93EC93B"
-swap_part_type="0657FD6D-A4AB-43C4-84E5-0933C84B4F4F "
+swap_part_type="0657FD6D-A4AB-43C4-84E5-0933C84B4F4F"
 efi_part_uuid=$(cat efi-part.uuid)
 luks_part_uuid=$(cat luks-part.uuid)
 btrfs_uuid=$(cat btrfs.uuid)
@@ -133,9 +134,9 @@ fi
 
 function wait_for_file {
     filename="$1"
-    while [ ! -e $filename ]
+    while [ ! -e "$filename" ]
     do
-        echo waiting for $filename to be created
+        echo waiting for "$filename" to be created
         sleep 3
     done
 }
@@ -148,7 +149,9 @@ fi
 if [ ! -f $KEYFILE ]; then
     # TODO do we want to store this file in the installed system?
     notify generate key file for luks
-    dd if=/dev/random of=${KEYFILE} bs=512 count=1 || exit 1
+    umask 077
+    dd if=/dev/urandom of=${KEYFILE} bs=512 count=1 || exit 1
+    chmod 600 ${KEYFILE} || exit 1
     notify "remove any old luks on ${root_partition} (root)"
     cryptsetup erase --batch-mode ${root_partition}
     wait_for_file ${root_partition}
@@ -209,7 +212,7 @@ fi
 if [ ! -f vfat_created.txt ]; then
     notify create esp filesystem on ${efi_partition}
     wipefs -a ${efi_partition} || exit 1
-    mkfs.vfat ${efi_partition} || exit 1
+    mkfs.vfat -F32 ${efi_partition} || exit 1
     touch vfat_created.txt
 fi
 
@@ -287,7 +290,7 @@ if [ "${ENABLE_SWAP}" == "file" ]; then
     notify make swap file at ${target}/swap/swapfile
     btrfs filesystem mkswapfile --size ${SWAP_SIZE}G ${target}/swap/swapfile || exit 1
     swapon ${target}/swap/swapfile || exit 1
-    swapfile_offset=$(btrfs inspect-internal map-swapfile -r ${target}//swap/swapfile)
+    swapfile_offset=$(btrfs inspect-internal map-swapfile -r ${target}/swap/swapfile)
     kernel_params="${kernel_params} rd.luks.name=${root_uuid}=${luks_device} resume=${root_device} resume_offset=${swapfile_offset}"
 fi
 
@@ -307,7 +310,7 @@ else
     mount --bind /etc/resolv.conf ${target}/etc/resolv.conf || exit 1
 fi
 
-if mountpoint -q "${efi_partition}" ; then
+if mountpoint -q "${target}/boot/efi" ; then
     echo efi esp partition ${efi_partition} already mounted on ${target}/boot/efi
 else
     notify mount efi esp partition ${efi_partition} on ${target}/boot/efi
@@ -406,8 +409,8 @@ if [ ! -z "${USERNAME}" ]; then
         echo ${USERNAME} user already set up
     else
         notify set up ${USERNAME} user
-        chroot ${target}/ bash -c "adduser ${USERNAME} --disabled-password --gecos "${USER_FULL_NAME}"" || exit 1
-        chroot ${target}/ bash -c "adduser ${USERNAME} sudo" || exit 1
+        chroot ${target}/ adduser "${USERNAME}" --disabled-password --gecos "${USER_FULL_NAME}" || exit 1
+        chroot ${target}/ adduser "${USERNAME}" sudo || exit 1
         if [ ! -z "${USER_PASSWORD}" ]; then
             echo "${USERNAME}:${USER_PASSWORD}" > ${target}/tmp/passwd || exit 1
             chroot ${target}/ bash -c "chpasswd < /tmp/passwd" || exit 1
@@ -439,6 +442,7 @@ fi
 cat <<EOF > ${target}/tmp/run1.sh || exit 1
 #!/bin/bash
 export DEBIAN_FRONTEND=noninteractive
+apt-get update -y || exit 1
 apt-get install -y locales  tasksel network-manager sudo || exit 1
 apt-get install -y -t ${BACKPORTS_VERSION} systemd systemd-boot dracut btrfs-progs cryptsetup tpm2-tools tpm-udev || exit 1
 if [ "${ENABLE_SNAPPER}" == "true" ]; then
