@@ -51,7 +51,18 @@ ensure_pkg tar || true
 BUNDLE_URL=${BUNDLE_URL:-"https://github.com/Anonymo/debian-installer/releases/latest/download/opinionated-debian-installer.tar.gz"}
 TMP_DIR=$(mktemp -d)
 echo "> Attempting to download prebuilt installer bundle..."
+SHA_URL=${BUNDLE_SHA_URL:-"https://github.com/Anonymo/debian-installer/releases/latest/download/SHA256SUMS"}
 if (wget -q --show-progress -O "${TMP_DIR}/installer.tar.gz" "${BUNDLE_URL}" || curl -fL --progress-bar -o "${TMP_DIR}/installer.tar.gz" "${BUNDLE_URL}") && [ -s "${TMP_DIR}/installer.tar.gz" ]; then
+  # Try checksum verification if available
+  if (wget -q -O "${TMP_DIR}/SHA256SUMS" "${SHA_URL}" || curl -fsSL -o "${TMP_DIR}/SHA256SUMS" "${SHA_URL}") && [ -s "${TMP_DIR}/SHA256SUMS" ]; then
+    echo "> Verifying checksum..."
+    (cd "${TMP_DIR}" && sha256sum -c <(grep opinionated-debian-installer.tar.gz SHA256SUMS)) || {
+      echo "! Checksum verification failed. Aborting bundle install." >&2
+      exit 1
+    }
+  else
+    echo "> No checksum found, continuing without verification"
+  fi
   echo "> Downloaded bundle. Extracting and starting..."
   mkdir -p /opt
   BUNDLE_DIR=/opt/opinionated-debian-installer

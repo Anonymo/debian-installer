@@ -40,26 +40,35 @@ cat > "${BUNDLE_DIR}/run_from_bundle.sh" <<'EOF'
 set -euo pipefail
 
 PORT=${PORT:-5000}
-URL="http://localhost:${PORT}"
+BIND_ADDR=${BIND_ADDR:-127.0.0.1}
+URL="http://${BIND_ADDR}:${PORT}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
-export BACK_END_IP_ADDRESS=127.0.0.1
+export BACK_END_IP_ADDRESS="${BIND_ADDR}"
 export INSTALLER_SCRIPT="${SCRIPT_DIR}/installer.sh"
+
+if [ ! -d /sys/firmware/efi ]; then
+  echo "! Warning: System does not appear to be booted in EFI mode. The installer requires EFI." >&2
+fi
 
 echo "> Starting installer backend on ${URL}"
 "${SCRIPT_DIR}/opinionated-installer" backend --listenPort "${PORT}" --staticHtmlFolder "${SCRIPT_DIR}/static" &
 PID=$!
 sleep 1
 
-# Try to open browser as the invoking desktop user, not root
-if [ -n "${SUDO_USER:-}" ] && command -v xdg-open >/dev/null 2>&1; then
-  sudo -u "${SUDO_USER}" xdg-open "${URL}" >/dev/null 2>&1 || echo "Open your browser to: ${URL}"
-elif command -v xdg-open >/dev/null 2>&1; then
-  xdg-open "${URL}" >/dev/null 2>&1 || echo "Open your browser to: ${URL}"
-elif command -v sensible-browser >/dev/null 2>&1; then
-  sensible-browser "${URL}" >/dev/null 2>&1 || echo "Open your browser to: ${URL}"
+if [ "${HEADLESS:-}" != "1" ]; then
+  # Try to open browser as the invoking desktop user, not root
+  if [ -n "${SUDO_USER:-}" ] && command -v xdg-open >/dev/null 2>&1; then
+    sudo -u "${SUDO_USER}" xdg-open "${URL}" >/dev/null 2>&1 || echo "Open your browser to: ${URL}"
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "${URL}" >/dev/null 2>&1 || echo "Open your browser to: ${URL}"
+  elif command -v sensible-browser >/dev/null 2>&1; then
+    sensible-browser "${URL}" >/dev/null 2>&1 || echo "Open your browser to: ${URL}"
+  else
+    echo "Open your browser to: ${URL}"
+  fi
 else
-  echo "Open your browser to: ${URL}"
+  echo "Headless mode: not opening a browser. URL: ${URL}"
 fi
 
 echo "> Backend PID: ${PID}. Press Ctrl+C to stop."
@@ -68,5 +77,8 @@ EOF
 chmod +x "${BUNDLE_DIR}/run_from_bundle.sh"
 
 (cd "${OUT_DIR}" && tar -czf opinionated-debian-installer.tar.gz "$(basename "${BUNDLE_DIR}")")
-echo "Created: ${OUT_DIR}/opinionated-debian-installer.tar.gz"
 
+# Create checksums
+(cd "${OUT_DIR}" && sha256sum opinionated-debian-installer.tar.gz > SHA256SUMS)
+echo "Created: ${OUT_DIR}/opinionated-debian-installer.tar.gz"
+echo "SHA256: $(cut -d' ' -f1 "${OUT_DIR}/SHA256SUMS")"
