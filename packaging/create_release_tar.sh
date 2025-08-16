@@ -1,0 +1,72 @@
+#!/bin/bash
+set -euo pipefail
+
+# Creates a self-contained tarball with:
+#  - opinionated-installer (Go backend)
+#  - static/ (built web UI)
+#  - installer.sh (this repo’s installer script)
+#  - run_from_bundle.sh (starter script for users)
+
+ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+OUT_DIR="${ROOT_DIR}/dist"
+BUNDLE_DIR="${OUT_DIR}/opinionated-debian-installer"
+STATIC_SRC="${ROOT_DIR}/frontend/dist"
+BACKEND_SRC_BIN="${ROOT_DIR}/frontend-tui/opinionated-installer"
+INSTALLER_SH="${ROOT_DIR}/installer.sh"
+
+rm -rf "${OUT_DIR}" && mkdir -p "${BUNDLE_DIR}"
+
+if [ ! -x "${BACKEND_SRC_BIN}" ]; then
+  echo "Backend binary not found at ${BACKEND_SRC_BIN}. Build it first." >&2
+  exit 1
+fi
+if [ ! -d "${STATIC_SRC}" ]; then
+  echo "Frontend dist not found at ${STATIC_SRC}. Build it first." >&2
+  exit 1
+fi
+if [ ! -f "${INSTALLER_SH}" ]; then
+  echo "installer.sh not found at ${INSTALLER_SH}." >&2
+  exit 1
+fi
+
+cp -a "${BACKEND_SRC_BIN}" "${BUNDLE_DIR}/opinionated-installer"
+mkdir -p "${BUNDLE_DIR}/static"
+cp -a "${STATIC_SRC}/"* "${BUNDLE_DIR}/static/"
+cp -a "${INSTALLER_SH}" "${BUNDLE_DIR}/installer.sh"
+chmod +x "${BUNDLE_DIR}/opinionated-installer" "${BUNDLE_DIR}/installer.sh"
+
+cat > "${BUNDLE_DIR}/run_from_bundle.sh" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+
+PORT=${PORT:-5000}
+URL="http://localhost:${PORT}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+export BACK_END_IP_ADDRESS=127.0.0.1
+export INSTALLER_SCRIPT="${SCRIPT_DIR}/installer.sh"
+
+echo "> Starting installer backend on ${URL}"
+"${SCRIPT_DIR}/opinionated-installer" backend --listenPort "${PORT}" --staticHtmlFolder "${SCRIPT_DIR}/static" &
+PID=$!
+sleep 1
+
+# Try to open browser as the invoking desktop user, not root
+if [ -n "${SUDO_USER:-}" ] && command -v xdg-open >/dev/null 2>&1; then
+  sudo -u "${SUDO_USER}" xdg-open "${URL}" >/dev/null 2>&1 || echo "Open your browser to: ${URL}"
+elif command -v xdg-open >/dev/null 2>&1; then
+  xdg-open "${URL}" >/dev/null 2>&1 || echo "Open your browser to: ${URL}"
+elif command -v sensible-browser >/dev/null 2>&1; then
+  sensible-browser "${URL}" >/dev/null 2>&1 || echo "Open your browser to: ${URL}"
+else
+  echo "Open your browser to: ${URL}"
+fi
+
+echo "> Backend PID: ${PID}. Press Ctrl+C to stop."
+wait ${PID}
+EOF
+chmod +x "${BUNDLE_DIR}/run_from_bundle.sh"
+
+(cd "${OUT_DIR}" && tar -czf opinionated-debian-installer.tar.gz "$(basename "${BUNDLE_DIR}")")
+echo "Created: ${OUT_DIR}/opinionated-debian-installer.tar.gz"
+

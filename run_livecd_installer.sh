@@ -115,12 +115,16 @@ echo "> Starting backend on http://localhost:${PORT}"
   "${BACKEND_BIN}" backend --listenPort "${PORT}" --staticHtmlFolder "${STATIC_DIR}" &
   BACK_PID=$!
   sleep 2
-  if command -v xdg-open >/dev/null 2>&1; then
-    xdg-open "http://localhost:${PORT}" || true
+  URL="http://localhost:${PORT}"
+  # Try to open browser as the invoking desktop user, not root
+  if [ -n "${SUDO_USER:-}" ] && command -v xdg-open >/dev/null 2>&1; then
+    sudo -u "${SUDO_USER}" xdg-open "${URL}" >/dev/null 2>&1 || echo "Open your browser to: ${URL}"
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "${URL}" >/dev/null 2>&1 || echo "Open your browser to: ${URL}"
   elif command -v sensible-browser >/dev/null 2>&1; then
-    sensible-browser "http://localhost:${PORT}" || true
+    sensible-browser "${URL}" >/dev/null 2>&1 || echo "Open your browser to: ${URL}"
   else
-    echo "Open your browser to: http://localhost:${PORT}"
+    echo "Open your browser to: ${URL}"
   fi
   echo "> Backend PID: ${BACK_PID}. Press Ctrl+C to stop."
   wait ${BACK_PID}
