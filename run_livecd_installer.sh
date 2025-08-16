@@ -34,7 +34,8 @@ ensure_pkg() {
   if ! dpkg -s "$pkg" >/dev/null 2>&1; then
     echo "> Installing package: $pkg"
     $SUDO apt-get update -y
-    $SUDO DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg"
+    # Ensure DEBIAN_FRONTEND is propagated correctly through sudo
+    $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg"
   fi
 }
 
@@ -103,6 +104,11 @@ fi
 export BACK_END_IP_ADDRESS=127.0.0.1
 export INSTALLER_SCRIPT="${ROOT_DIR}/installer.sh"
 
+# Ensure installer script is executable
+if [ ! -x "${INSTALLER_SCRIPT}" ]; then
+  $SUDO chmod +x "${INSTALLER_SCRIPT}"
+fi
+
 echo "> Starting backend on http://localhost:${PORT}"
 (
   set -m
@@ -119,4 +125,3 @@ echo "> Starting backend on http://localhost:${PORT}"
   echo "> Backend PID: ${BACK_PID}. Press Ctrl+C to stop."
   wait ${BACK_PID}
 ) 
-
