@@ -1,15 +1,16 @@
-# Opinionated Debian Installer
+# Debian Btrfs Installer with Snapper
 
-This tool can be used to create a modern installation of Debian. 
+A modern Debian installer with enhanced Btrfs support and automatic snapshots using Snapper (openSUSE-style). Features a browser-based interface for easy installation directly from LiveCD.
+
 Our opinions of what a modern installation of Debian should look like in 2025 are:
 
  - Debian 13 (Trixie)
  - Backports and non-free enabled
  - Firmware installed
- - Installed on btrfs subvolumes
+ - Installed on Btrfs subvolumes with Snapper snapshots
  - Full disk encryption, unlocked by TPM
- - Fast installation using an image
- - Browser-based installer
+ - Enhanced systemd-boot with sdbootutil
+ - Browser-based installer for LiveCD usage
   
 ## Limitations
 
@@ -17,21 +18,42 @@ Our opinions of what a modern installation of Debian should look like in 2025 ar
  - Amd64 with EFI only
  - The installer is in english only
 
-## Downloads
+## Quick Installation from LiveCD
 
-| Desktop environment | Download                                                                                                                                                               | SHA-256 Checksum                                                        |
-|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------|
-| KDE Plasma          | [opinionated-debian-installer-trixie-kde-plasma-20250420a.img (5.0GB)](https://debian-installer.lamac.cc/opinionated-debian-installer-trixie-kde-plasma-20250420a.img) | b56a0506 8e9f49ec 83345924 d288917b 0da0eb9f 93c4c518 aa258b05 592df2ae |
-| Gnome               | [opinionated-debian-installer-trixie-gnome-20250314a.img (4.2GB)](https://debian-installer.lamac.cc/opinionated-debian-installer-trixie-gnome-20250314a.img)           | d8c95969 c15d7401 6ece243c 11c724b2 1b139553 ece215bd 6443f6ab 68ae7771 |
-| Server              | [opinionated-debian-installer-trixie-server-20250413a.img (2.9GB)](https://debian-installer.lamac.cc/opinionated-debian-installer-trixie-server-20250413a.img)         | 30087ea9 7407b62b c733bd2f bfe195fc 1675a720 18d3e492 d6c787c2 05008a73 |
+This installer is designed to run directly from any Debian Live USB/CD without requiring pre-built installer images.
 
-## Instructions
+### Method 1: From Debian Live USB/CD
 
-1. Download one of the live image files from the table above
-2. Write the image file to a USB flash drive. **Do not use ventoy** or similar "clever" tools - they are not compatible with these images. If you need a GUI, use [etcher](https://github.com/balena-io/etcher/releases) or [win32DiskImager](https://sourceforge.net/projects/win32diskimager/files/Archive/) or just use dd - `dd if=opinionated-debian-installer*.img of=/dev/sdX bs=256M oflag=dsync status=progress` where sdX is your USB flash drive 
-3. Boot from the USB flash drive
-4. Start the installer icon from the desktop/dash, fill in the form in the browser and press the big _Install_ button
-5. Reboot and enjoy
+1. **Boot from a standard Debian Live USB/CD** (GNOME, KDE, or any desktop environment)
+2. **Open a terminal** and run:
+
+```bash
+git clone -b btrfs https://github.com/Anonymo/debian-installer.git
+cd debian-installer
+sudo ./livecd-setup.sh
+```
+
+3. **Open the installer** by navigating to the desktop icon or visiting `http://localhost/opinionated-debian-installer/` in your browser
+4. **Fill in the installation form** and click the Install button
+5. **Reboot** when complete and enjoy your new system
+
+### Method 2: Build Your Own Installer Image (Advanced)
+
+If you prefer to create a custom installer image:
+
+1. Clone this repository
+2. Edit the configuration variables
+3. Run the image building scripts: `make_image_1.sh`, `make_image_2.sh`, `make_image_3.sh`
+
+## New Features
+
+This enhanced version includes:
+
+- **🔄 Snapper Snapshots**: Automatic system snapshots using openSUSE's Snapper configuration
+- **⚙️ sdbootutil Integration**: Enhanced systemd-boot management from openSUSE
+- **🎨 Ubuntu Theme Option**: Apply Ubuntu's Yaru theme and fonts (without Flatpak)
+- **📱 Direct LiveCD Usage**: No need to create custom installer images
+- **🛡️ Enhanced Security**: Optional encryption with TPM2 auto-unlock
 
 ## Screencast & Screenshot
 
@@ -45,18 +67,20 @@ Video of installation of Debian with KDE Plasma (Bookworm version):
 
 ## Details
 
-- GPT disk partitions are created on the designated disk drive: 
-  - UEFI ESP partition
-  - Optional swap partition - LUKS encrypted
-  - Root partition - [LUKS](https://cryptsetup-team.pages.debian.net/cryptsetup/README.Debian.html) encrypted (rest of the drive)
-- GPT root partition is [auto-discoverable](https://www.freedesktop.org/software/systemd/man/systemd-gpt-auto-generator.html)
-- Btrfs subvolumes will be called `@` for `/` and `@home` for `/home` (compatible with [timeshift](https://github.com/teejee2008/timeshift#supported-system-configurations)); the top-level subvolume will be mounted to `/root/btrfs1`
-- The system is installed using an image from the live iso. This will speed up the installation significantly and allow off-line installation.
-- [Dracut](https://github.com/dracutdevs/dracut/wiki/) is used instead of initramfs-tools
-- [Systemd-boot](https://www.freedesktop.org/wiki/Software/systemd/systemd-boot/) is used instead of grub
-- [Network-manager](https://wiki.debian.org/NetworkManager) is used for networking
-- [Systemd-cryptenroll](https://www.freedesktop.org/software/systemd/man/systemd-cryptenroll.html#--tpm2-device=PATH) is used to unlock the disk, using TPM (if available)
-- [Sudo](https://wiki.debian.org/sudo) is installed and configured for the created user 
+- **Disk Layout**: GPT partitions with UEFI ESP and encrypted root partition
+- **Btrfs Subvolumes**: openSUSE-style layout optimized for Snapper:
+  - `@` - Root filesystem
+  - `@home` - User home directories  
+  - `@snapshots` - Snapper snapshots storage
+  - `@var` - Variable data
+  - `@log` - System logs
+  - `@swap` - Swap file (optional)
+- **Snapper Integration**: Automatic snapshots with configurable retention policies
+- **Enhanced Boot**: [systemd-boot](https://www.freedesktop.org/wiki/Software/systemd/systemd-boot/) with optional [sdbootutil](https://github.com/openSUSE/sdbootutil) integration
+- **Modern Init**: [Dracut](https://github.com/dracutdevs/dracut/wiki/) instead of initramfs-tools
+- **Network**: [NetworkManager](https://wiki.debian.org/NetworkManager) for networking
+- **Security**: [LUKS encryption](https://cryptsetup-team.pages.debian.net/cryptsetup/README.Debian.html) with [TPM2 auto-unlock](https://www.freedesktop.org/software/systemd/man/systemd-cryptenroll.html#--tpm2-device=PATH)
+- **User Management**: [Sudo](https://wiki.debian.org/sudo) configured for the created user 
 
 ## (Optional) Configuration, Automatic Installation
 
@@ -186,26 +210,37 @@ flowchart RL
     F[installer.sh] -->|stdout| C
 ```
 
-## Comparison
+## Credits
 
-The following table contains comparison of features between our opinionated debian installer and official debian installers.
+This project is based on:
+- [r0b0's debian-installer](https://github.com/r0b0/debian-installer) - Original installer framework
+- [openSUSE's sdbootutil](https://github.com/openSUSE/sdbootutil) - systemd-boot integration
+- openSUSE's Btrfs layout and Snapper configuration  
+- Ubuntu theme inspired by [DeltaLima's make-debian-look-like-ubuntu](https://github.com/DeltaLima/make-debian-look-like-ubuntu) - simplified version without Flatpak
 
-| Feature                                             | ODIN  | [Netinstall](https://www.debian.org/CD/netinst/) | [Calamares](https://get.debian.org/debian-cd/current-live/amd64/iso-hybrid/) |
-|-----------------------------------------------------|-------|--------------------------------------------------|------------------------------------------------------------------------------|
-| Installer internationalization                      | N     | Y                                                | Y                                                                            |
-| Mirror selection, HTTP proxy support                | N     | Y                                                | N                                                                            |
-| Manual disk partitioning, LVM, filesystem selection | N[4]  | Y                                                | Y                                                                            |
-| Btrfs subvolumes                                    | Y[2]  | Y[3]                                             | Y[2]                                                                         |
-| Full drive encryption                               | **Y** | Y[1]                                             | Y                                                                            |
-| Passwordless unlock (TPM)                           | **Y** | N                                                | N                                                                            |
-| Image-based installation                            | **Y** | N                                                | N                                                                            |
-| Non-free and backports                              | **Y** | N                                                | N                                                                            |
-| Browser-based installer                             | **Y** | N                                                | N                                                                            |
+## Features Comparison
 
-[1] `/boot` needs a separate unencrypted partition
+| Feature                                 | This Installer | [Netinstall](https://www.debian.org/CD/netinst/) | [Calamares](https://get.debian.org/debian-cd/current-live/amd64/iso-hybrid/) |
+|----------------------------------------|----------------|--------------------------------------------------|------------------------------------------------------------------------------|
+| Browser-based installer                | ✅ **Yes**     | ❌ No                                            | ❌ No                                                                        |
+| Btrfs with Snapper snapshots          | ✅ **Yes**     | ❌ No                                            | ❌ No                                                                        |
+| TPM2 auto-unlock                      | ✅ **Yes**     | ❌ No                                            | ❌ No                                                                        |
+| systemd-boot with sdbootutil          | ✅ **Yes**     | ❌ No                                            | ❌ No                                                                        |
+| Direct LiveCD usage                   | ✅ **Yes**     | ❌ No                                            | ✅ Yes                                                                       |
+| Full drive encryption                 | ✅ Yes         | ✅ Yes*                                          | ✅ Yes                                                                       |
+| Non-free firmware & backports         | ✅ **Yes**     | ❌ No                                            | ❌ No                                                                        |
+| Manual partitioning                   | ❌ No          | ✅ Yes                                           | ✅ Yes                                                                       |
+| Multiple languages                    | ❌ No          | ✅ Yes                                           | ✅ Yes                                                                       |
 
-[2] `@` and `@home` ([timeshift](https://github.com/linuxmint/timeshift#supported-system-configurations) compatible)
+*Requires separate unencrypted `/boot` partition
 
-[3] `@rootfs`
+## License
 
-[4] Fixed partitioning (see Details above), LUKS is automatic, BTRFS is used as filesystem
+MIT License - See [LICENSE](LICENSE) file
+
+## Contributing
+
+Contributions are welcome! Please ensure:
+- Proper attribution for external code
+- Test changes thoroughly  
+- Document new features
