@@ -140,6 +140,51 @@ if [ ! -x "${INSTALLER_SCRIPT}" ]; then
 fi
 
 echo "> Starting backend on http://localhost:${PORT}"
+
+# Helper: check and free/choose a port
+is_port_busy() {
+  local p="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn | awk '{print $4}' | grep -q ":${p}$"
+  elif command -v fuser >/dev/null 2>&1; then
+    fuser -s "${p}/tcp"
+  else
+    return 1
+  fi
+}
+
+try_free_port() {
+  local p="$1"
+  # Try to kill our own previous backends
+  pkill -f 'opinionated-installer.*backend' >/dev/null 2>&1 || true
+  if command -v fuser >/dev/null 2>&1; then
+    fuser -k "${p}/tcp" >/dev/null 2>&1 || true
+  fi
+}
+
+pick_port() {
+  local p="${1:-5000}"
+  local max_tries=10
+  local i=0
+  while [ $i -le $max_tries ]; do
+    if ! is_port_busy "$p"; then
+      echo "$p"
+      return 0
+    fi
+    try_free_port "$p"
+    sleep 1
+    if ! is_port_busy "$p"; then
+      echo "$p"
+      return 0
+    fi
+    p=$((p+1))
+    i=$((i+1))
+  done
+  echo "$p"
+}
+
+PORT="$(pick_port "${PORT}")"
+
 (
   set -m
   "${BACKEND_BIN}" backend --listenPort "${PORT}" --staticHtmlFolder "${STATIC_DIR}" &
