@@ -4,20 +4,65 @@ Browser-driven Debian installer optimized for Btrfs + TPM, to be run from a Debi
 
 ## Requirements
 
-- UEFI boot (amd64)
-- Debian Live environment (recommended)
-- Internet access to fetch packages
+- **64-bit computer** with UEFI boot support
+- **Debian Live USB/CD** (any desktop environment works)
+- **Internet connection** (WiFi or Ethernet)
+- **Target disk** with at least 20GB space
+- **UEFI mode enabled** in BIOS (disable Legacy/CSM mode)
 
 ## Quick Start (LiveCD)
 
-1. Boot a Debian Live USB/CD (UEFI)
-2. Open a terminal in this repo folder and run:
+### Step 1: Boot Debian Live USB/CD
+1. **Download** a standard Debian Live ISO (GNOME or KDE recommended) from [debian.org](https://www.debian.org/CD/live/)
+2. **Write** the ISO to a USB drive using `dd`, Rufus, or Etcher
+3. **Boot** from the USB drive in **UEFI mode** (disable Legacy/CSM in BIOS)
+4. **Connect** to the internet (WiFi or Ethernet)
 
+### Step 2: Download and Run the Installer
+1. **Open a terminal** (Applications → Terminal or Ctrl+Alt+T)
+2. **Download the installer**:
+```bash
+git clone -b btrfs https://github.com/Anonymo/debian-installer.git
+cd debian-installer
+```
+
+3. **Run the installer**:
 ```bash
 sudo ./run_livecd_installer.sh
 ```
 
-This installs any missing tools, builds the UI/backend if sources are present, starts the backend on `http://localhost:5000`, and opens your browser. Fill the form and click Install. The script runs `installer.sh` under the hood.
+### Step 3: Install Debian
+- The script will automatically open your browser to `http://localhost:5000`
+- **Fill out the installation form** (disk, passwords, hostname, etc.)
+- **Click "Install"** and wait for completion
+- **Reboot** when finished
+
+That's it! The script handles all the setup, starts the web interface, and runs the installation automatically.
+
+## Troubleshooting
+
+### Browser doesn't open automatically
+- Manually open Firefox/Chromium and go to `http://localhost:5000`
+
+### "git: command not found"
+```bash
+sudo apt update && sudo apt install -y git
+```
+
+### "Permission denied" errors
+- Make sure you're running with `sudo`
+- Check that the script is executable: `chmod +x run_livecd_installer.sh`
+
+### Installation fails
+- Ensure UEFI boot mode is enabled (not Legacy BIOS)
+- Check internet connection is working
+- Verify target disk has sufficient space (20GB minimum)
+- Try a different USB port or recreate the Live USB
+
+### Can't boot after installation
+- Check UEFI boot order in BIOS
+- Disable Secure Boot if enabled
+- Ensure the target disk is set as first boot device
 
 ## What It Installs
 
