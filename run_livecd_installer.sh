@@ -39,12 +39,31 @@ ensure_pkg() {
   fi
 }
 
-echo "> Ensuring basic tools (wget/curl/git/xdg-open) are available"
+echo "> Ensuring basic tools (wget/curl/git/xdg-open/tar) are available"
 ensure_pkg ca-certificates || true
 ensure_pkg wget || true
 ensure_pkg curl || true
 ensure_pkg git || true
 ensure_pkg xdg-utils || true
+ensure_pkg tar || true
+
+# Try prebuilt bundle first (most automated, no build required)
+BUNDLE_URL=${BUNDLE_URL:-"https://github.com/Anonymo/debian-installer/releases/latest/download/opinionated-debian-installer.tar.gz"}
+TMP_DIR=$(mktemp -d)
+echo "> Attempting to download prebuilt installer bundle..."
+if (wget -q --show-progress -O "${TMP_DIR}/installer.tar.gz" "${BUNDLE_URL}" || curl -fL --progress-bar -o "${TMP_DIR}/installer.tar.gz" "${BUNDLE_URL}") && [ -s "${TMP_DIR}/installer.tar.gz" ]; then
+  echo "> Downloaded bundle. Extracting and starting..."
+  mkdir -p /opt
+  BUNDLE_DIR=/opt/opinionated-debian-installer
+  $SUDO rm -rf "${BUNDLE_DIR}"
+  $SUDO mkdir -p "${BUNDLE_DIR}"
+  $SUDO tar -xzf "${TMP_DIR}/installer.tar.gz" -C "${BUNDLE_DIR}" --strip-components=1
+  $SUDO chmod +x "${BUNDLE_DIR}/run_from_bundle.sh" || true
+  echo "> Launching from bundle"
+  exec $SUDO "${BUNDLE_DIR}/run_from_bundle.sh"
+else
+  echo "> No prebuilt bundle found or download failed; falling back to building from sources..."
+fi
 
 # Build frontend if sources are present and dist is missing
 if [ -d "${ROOT_DIR}/frontend" ]; then

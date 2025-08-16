@@ -4,7 +4,12 @@ Start Here (TL;DR)
 - This installer ERASES the whole disk you select. Double‑check the drive.
 - Works from a standard Debian Live USB. No expert steps required.
 
-One‑liner (copy–paste in a Live USB terminal)
+Easiest (download prebuilt installer and run)
+```bash
+sudo bash -lc 'set -e; apt-get update -y; env DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates wget xdg-utils; tmp=$(mktemp -d); cd "$tmp"; wget -q --show-progress https://github.com/Anonymo/debian-installer/releases/latest/download/opinionated-debian-installer.tar.gz; tar -xzf opinionated-debian-installer.tar.gz; cd opinionated-debian-installer; sudo ./run_from_bundle.sh'
+```
+
+Alternate (build locally from this repo)
 ```bash
 sudo bash -lc 'set -e; apt-get update -y; env DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates git wget curl xdg-utils nodejs npm golang-go; work=/opt/debian-installer && rm -rf "$work" && git clone -b btrfs https://github.com/Anonymo/debian-installer.git "$work"; cd "$work"; chmod +x run_livecd_installer.sh; ./run_livecd_installer.sh'
 ```
