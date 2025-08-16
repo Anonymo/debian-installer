@@ -72,6 +72,15 @@ try_free_port() {
   fi
 }
 
+try_stop_services() {
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl stop installer_backend.service 2>/dev/null || true
+    systemctl disable installer_backend.service 2>/dev/null || true
+    systemctl stop installer_tui.service 2>/dev/null || true
+    systemctl disable installer_tui.service 2>/dev/null || true
+  fi
+}
+
 pick_port() {
   local p="${1:-5000}"
   local max_tries=10
@@ -81,6 +90,7 @@ pick_port() {
       echo "$p"
       return 0
     fi
+    try_stop_services
     try_free_port "$p"
     sleep 1
     if ! is_port_busy "$p"; then
