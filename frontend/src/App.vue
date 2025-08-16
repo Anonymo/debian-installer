@@ -35,6 +35,9 @@ export default {
         SWAP_SIZE: undefined,
         NVIDIA_PACKAGE: " ",  // will be changed in install()
         ENABLE_POPCON: undefined,
+        MAKE_UBUNTU_LIKE: false,
+        ENABLE_SUDO: true,
+        DISABLE_ROOT_ACCOUNT: false,
       }
     }
   },
@@ -304,6 +307,8 @@ export default {
       <fieldset>
         <legend>Root User</legend>
         <Password v-model="installer.ROOT_PASSWORD" :disabled="running" />
+        <input type="checkbox" v-model="installer.DISABLE_ROOT_ACCOUNT" id="DISABLE_ROOT_ACCOUNT" class="inline mt-3">
+        <label for="DISABLE_ROOT_ACCOUNT" class="inline mt-3">Disable root account (requires sudo)</label>
       </fieldset>
 
       <fieldset>
@@ -313,6 +318,8 @@ export default {
         <label for="full_name">Full Name</label>
         <input type="text" id="USER_FULL_NAME" v-model="installer.USER_FULL_NAME" :disabled="running">
         <Password v-model="installer.USER_PASSWORD" :disabled="running" />
+        <input type="checkbox" v-model="installer.ENABLE_SUDO" id="ENABLE_SUDO" class="inline mt-3">
+        <label for="ENABLE_SUDO" class="inline mt-3">Enable sudo for this user</label>
       </fieldset>
 
       <fieldset>
@@ -341,12 +348,16 @@ export default {
         <br>
         <input type="checkbox" v-model="installer.ENABLE_POPCON" id="ENABLE_POPCON" class="inline mt-3" :disabled="running">
         <label for="ENABLE_POPCON" class="inline mt-3">Participate in the <a href="https://popcon.debian.org/" target="_blank">debian package usage survey</a></label>
+
+        <br>
+        <input type="checkbox" v-model="installer.MAKE_UBUNTU_LIKE" id="MAKE_UBUNTU_LIKE" class="inline mt-3" :disabled="running">
+        <label for="MAKE_UBUNTU_LIKE" class="inline mt-3">Make Debian look like Ubuntu</label>
+
       </fieldset>
 
       <fieldset>
         <legend>Process</legend>
-        <button type="button" @click="install()"
-                :disabled="!can_start || running">
+        <button type="button" @click="install()">
             Install debian on {{ installer.DISK }} <b>OVERWRITING THE WHOLE DRIVE</b>
         </button>
         <br>

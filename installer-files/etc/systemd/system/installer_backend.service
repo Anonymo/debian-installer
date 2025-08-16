@@ -3,7 +3,7 @@ Description=Opinionated Debian Installer - Back-End
 After=network.target
 
 [Service]
-Environment=INSTALLER_SCRIPT=/installer.sh
+Environment=INSTALLER_SCRIPT=/installer_debootstrap.sh
 EnvironmentFile=-/boot/efi/installer.ini
 ExecStart=/sbin/opinionated-installer backend
 RuntimeDirectory=installer
