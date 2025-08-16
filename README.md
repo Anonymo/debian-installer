@@ -12,6 +12,18 @@ Browser-driven Debian installer optimized for Btrfs + TPM, to be run from a Debi
 
 ## Quick Start (LiveCD)
 
+Quick one-liner (fresh LiveCD):
+
+```bash
+sudo bash -lc 'set -e; apt-get update -y; env DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates git wget curl xdg-utils nodejs npm golang-go; work=/opt/debian-installer && rm -rf "$work" && git clone -b btrfs https://github.com/Anonymo/debian-installer.git "$work"; cd "$work"; chmod +x run_livecd_installer.sh; ./run_livecd_installer.sh'
+```
+
+Already cloned? From the repo folder:
+
+```bash
+sudo bash -lc 'set -e; apt-get update -y; env DEBIAN_FRONTEND=noninteractive apt-get install -y ca-certificates wget curl xdg-utils nodejs npm golang-go; chmod +x run_livecd_installer.sh; ./run_livecd_installer.sh'
+```
+
 ### Step 1: Boot Debian Live USB/CD
 1. **Download** a standard Debian Live ISO (GNOME or KDE recommended) from [debian.org](https://www.debian.org/CD/live/)
 2. **Write** the ISO to a USB drive using `dd`, Rufus, or Etcher
