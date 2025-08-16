@@ -59,6 +59,8 @@ is_port_busy() {
     ss -ltn | awk '{print $4}' | grep -q ":${p}$"
   elif command -v fuser >/dev/null 2>&1; then
     fuser -s "${p}/tcp"
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -i TCP:"${p}" -sTCP:LISTEN -t >/dev/null 2>&1
   else
     return 1
   fi
@@ -69,6 +71,9 @@ try_free_port() {
   pkill -f 'opinionated-installer.*backend' >/dev/null 2>&1 || true
   if command -v fuser >/dev/null 2>&1; then
     fuser -k "${p}/tcp" >/dev/null 2>&1 || true
+  fi
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -i TCP:"${p}" -sTCP:LISTEN -t | xargs -r kill -9 >/dev/null 2>&1 || true
   fi
 }
 
@@ -106,9 +111,20 @@ pick_port() {
 PORT="$(pick_port "${PORT}")"
 URL="http://${BIND_ADDR}:${PORT}"
 
-"${SCRIPT_DIR}/opinionated-installer" backend --listenPort "${PORT}" --staticHtmlFolder "${SCRIPT_DIR}/static" &
-PID=$!
-sleep 1
+max_tries=10
+i=0
+while [ $i -le $max_tries ]; do
+  "${SCRIPT_DIR}/opinionated-installer" backend --listenPort "${PORT}" --staticHtmlFolder "${SCRIPT_DIR}/static" &
+  PID=$!
+  sleep 1
+  if ps -p ${PID} >/dev/null 2>&1; then
+    break
+  fi
+  PORT=$((PORT+1))
+  URL="http://${BIND_ADDR}:${PORT}"
+  echo "> Port busy, retrying on ${URL}"
+  i=$((i+1))
+done
 
 if [ "${HEADLESS:-}" != "1" ]; then
   # Try to open browser as the invoking desktop user, not root

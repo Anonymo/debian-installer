@@ -139,8 +139,6 @@ if [ ! -x "${INSTALLER_SCRIPT}" ]; then
   $SUDO chmod +x "${INSTALLER_SCRIPT}"
 fi
 
-echo "> Starting backend on http://localhost:${PORT}"
-
 # Helper: check and free/choose a port
 is_port_busy() {
   local p="$1"
@@ -148,6 +146,8 @@ is_port_busy() {
     ss -ltn | awk '{print $4}' | grep -q ":${p}$"
   elif command -v fuser >/dev/null 2>&1; then
     fuser -s "${p}/tcp"
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -i TCP:"${p}" -sTCP:LISTEN -t >/dev/null 2>&1
   else
     return 1
   fi
@@ -159,6 +159,9 @@ try_free_port() {
   pkill -f 'opinionated-installer.*backend' >/dev/null 2>&1 || true
   if command -v fuser >/dev/null 2>&1; then
     fuser -k "${p}/tcp" >/dev/null 2>&1 || true
+  fi
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -i TCP:"${p}" -sTCP:LISTEN -t | xargs -r kill -9 >/dev/null 2>&1 || true
   fi
 }
 
@@ -196,12 +199,27 @@ pick_port() {
 
 PORT="$(pick_port "${PORT}")"
 
+URL="http://localhost:${PORT}"
+echo "> Starting backend on ${URL}"
+
 (
   set -m
-  "${BACKEND_BIN}" backend --listenPort "${PORT}" --staticHtmlFolder "${STATIC_DIR}" &
-  BACK_PID=$!
-  sleep 2
-  URL="http://localhost:${PORT}"
+  # Try to start; if it dies immediately (bind error), iterate next ports
+  max_tries=10
+  i=0
+  while [ $i -le $max_tries ]; do
+    "${BACKEND_BIN}" backend --listenPort "${PORT}" --staticHtmlFolder "${STATIC_DIR}" &
+    BACK_PID=$!
+    sleep 1
+    if ps -p ${BACK_PID} >/dev/null 2>&1; then
+      break
+    fi
+    # backend exited quickly; port may be in use; pick next
+    PORT=$((PORT+1))
+    URL="http://localhost:${PORT}"
+    echo "> Port busy, retrying on ${URL}"
+    i=$((i+1))
+  done
   # Try to open browser as the invoking desktop user, not root
   if [ -n "${SUDO_USER:-}" ] && command -v xdg-open >/dev/null 2>&1; then
     sudo -u "${SUDO_USER}" xdg-open "${URL}" >/dev/null 2>&1 || echo "Open your browser to: ${URL}"
