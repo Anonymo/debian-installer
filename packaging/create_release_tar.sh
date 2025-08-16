@@ -47,6 +47,17 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 export BACK_END_IP_ADDRESS="${BIND_ADDR}"
 export INSTALLER_SCRIPT="${SCRIPT_DIR}/installer.sh"
 
+# Ensure host dependencies are present
+need_pkg() { dpkg -s "$1" >/dev/null 2>&1 || return 0; }
+install_pkgs() {
+  apt-get update -y || true
+  DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
+}
+if ! command -v debootstrap >/dev/null 2>&1; then
+  echo "> Installing required host packages..."
+  install_pkgs cryptsetup debootstrap uuid-runtime btrfs-progs dosfstools || true
+fi
+
 if [ ! -d /sys/firmware/efi ]; then
   echo "! Warning: System does not appear to be booted in EFI mode. The installer requires EFI." >&2
 fi

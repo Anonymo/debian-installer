@@ -17,6 +17,7 @@ NVIDIA_PACKAGE=
 ENABLE_POPCON=false
 SSH_PUBLIC_KEY=
 AFTER_INSTALLED_CMD=
+DISABLE_LUKS=false
 fi
 
 function notify () {
@@ -51,11 +52,10 @@ if [ -z "${LUKS_PASSWORD}" ]; then
     exit 3
 fi
 
-if [ -z "${NON_INTERACTIVE}" ]; then
-    notify install required packages
-    apt-get update -y  || exit 1
-    apt-get install -y cryptsetup debootstrap uuid-runtime btrfs-progs dosfstools || exit 1
-fi
+# Always ensure host dependencies are present (even in NON_INTERACTIVE mode)
+notify install required packages on host
+apt-get update -y  || true
+DEBIAN_FRONTEND=noninteractive apt-get install -y cryptsetup debootstrap uuid-runtime btrfs-progs dosfstools || exit 1
 
 KEYFILE=luks.key
 if [ ! -f efi-part.uuid ]; then
@@ -88,8 +88,13 @@ btrfs_uuid=$(cat btrfs.uuid)
 top_level_mount=/mnt/top_level_mount
 target=/target
 luks_device=root
-root_device=/dev/mapper/${luks_device}
-kernel_params="rd.luks.options=tpm2-device=auto rw quiet rootfstype=btrfs rootflags=${FSFLAGS},subvol=@ rd.auto=1 splash"
+if [ "${DISABLE_LUKS}" = "true" ]; then
+  root_device="${root_partition}"
+  kernel_params="rw quiet rootfstype=btrfs rootflags=${FSFLAGS},subvol=@ rd.auto=1 splash"
+else
+  root_device=/dev/mapper/${luks_device}
+  kernel_params="rd.luks.options=tpm2-device=auto rw quiet rootfstype=btrfs rootflags=${FSFLAGS},subvol=@ rd.auto=1 splash"
+fi
 efi_partition=/dev/disk/by-partuuid/${efi_part_uuid}
 root_partition=/dev/disk/by-partuuid/${luks_part_uuid}
 
@@ -146,7 +151,7 @@ if [ "${ENABLE_SWAP}" == "partition" ]; then
     wait_for_file ${swap_partition}
 fi
 
-if [ ! -f $KEYFILE ]; then
+if [ "${DISABLE_LUKS}" != "true" ] && [ ! -f $KEYFILE ]; then
     # TODO do we want to store this file in the installed system?
     notify generate key file for luks
     umask 077
@@ -182,12 +187,13 @@ function setup_luks {
   cryptsetup luksUUID "$1" > luks.uuid || exit 1
 }
 
-setup_luks ${root_partition}
-root_uuid=$(cat luks.uuid)
-
-if [ ! -e ${root_device} ]; then
-    notify open luks on root
-    cryptsetup luksOpen ${root_partition} ${luks_device} --key-file $KEYFILE || exit 1
+if [ "${DISABLE_LUKS}" != "true" ]; then
+  setup_luks ${root_partition}
+  root_uuid=$(cat luks.uuid)
+  if [ ! -e ${root_device} ]; then
+      notify open luks on root
+      cryptsetup luksOpen ${root_partition} ${luks_device} --key-file $KEYFILE || exit 1
+  fi
 fi
 
 if [ -e /dev/disk/by-partlabel/BaseImage ]; then
@@ -217,19 +223,22 @@ if [ ! -f vfat_created.txt ]; then
 fi
 
 if [ "${ENABLE_SWAP}" == "partition" ]; then
-    setup_luks ${swap_partition} || exit 1
-    swap_uuid=$(cat luks.uuid)
-
-    kernel_params="${kernel_params} rd.luks.name=${swap_uuid}=${swap_device} resume=/dev/mapper/${swap_device}"
-
-    if [ ! -e /dev/mapper/${swap_device} ]; then
-        notify open luks swap
-        cryptsetup luksOpen ${swap_partition} ${swap_device} --key-file $KEYFILE || exit 1
+    if [ "${DISABLE_LUKS}" != "true" ]; then
+        setup_luks ${swap_partition} || exit 1
+        swap_uuid=$(cat luks.uuid)
+        kernel_params="${kernel_params} rd.luks.name=${swap_uuid}=${swap_device} resume=/dev/mapper/${swap_device}"
+        if [ ! -e /dev/mapper/${swap_device} ]; then
+            notify open luks swap
+            cryptsetup luksOpen ${swap_partition} ${swap_device} --key-file $KEYFILE || exit 1
+        fi
+        notify making swap
+        mkswap /dev/mapper/${swap_device} || exit 1
+        swapon /dev/mapper/${swap_device} || exit 1
+    else
+        notify making plaintext swap on ${swap_partition}
+        mkswap ${swap_partition} || exit 1
+        swapon ${swap_partition} || exit 1
     fi
-
-    notify making swap
-    mkswap /dev/mapper/${swap_device} || exit 1
-    swapon /dev/mapper/${swap_device} || exit 1
 fi  # swap as partition
 
 if mountpoint -q "${top_level_mount}" ; then
@@ -291,7 +300,11 @@ if [ "${ENABLE_SWAP}" == "file" ]; then
     btrfs filesystem mkswapfile --size ${SWAP_SIZE}G ${target}/swap/swapfile || exit 1
     swapon ${target}/swap/swapfile || exit 1
     swapfile_offset=$(btrfs inspect-internal map-swapfile -r ${target}/swap/swapfile)
-    kernel_params="${kernel_params} rd.luks.name=${root_uuid}=${luks_device} resume=${root_device} resume_offset=${swapfile_offset}"
+    if [ "${DISABLE_LUKS}" != "true" ]; then
+      kernel_params="${kernel_params} rd.luks.name=${root_uuid}=${luks_device} resume=${root_device} resume_offset=${swapfile_offset}"
+    else
+      kernel_params="${kernel_params} resume=${root_device} resume_offset=${swapfile_offset}"
+    fi
 fi
 
 if [ ! -f ${target}/etc/debian_version ]; then
@@ -341,9 +354,15 @@ PARTUUID=${efi_part_uuid} /boot/efi vfat defaults,umask=077 0 2
 EOF
 
 if [ "${ENABLE_SWAP}" == "partition" ]; then
+  if [ "${DISABLE_LUKS}" != "true" ]; then
 cat <<EOF >> ${target}/etc/fstab || exit 1
 /dev/mapper/${swap_device} swap swap defaults 0 0
 EOF
+  else
+cat <<EOF >> ${target}/etc/fstab || exit 1
+PARTUUID=${swap_part_uuid} swap swap defaults 0 0
+EOF
+  fi
 elif [ "${ENABLE_SWAP}" == "file" ]; then
 cat <<EOF >> ${target}/etc/fstab || exit 1
 UUID=${btrfs_uuid} /swap btrfs defaults,subvol=@swap,noatime 0 0
@@ -421,10 +440,18 @@ fi
 
 notify configuring dracut and kernel command line
 mkdir -p ${target}/etc/dracut.conf.d
+if [ "${DISABLE_LUKS}" = "true" ]; then
+cat <<EOF > ${target}/etc/dracut.conf.d/90-btrfs.conf || exit 1
+add_dracutmodules+=" systemd btrfs "
+omit_dracutmodules+=" crypt tpm2-tss "
+kernel_cmdline="${kernel_params}"
+EOF
+else
 cat <<EOF > ${target}/etc/dracut.conf.d/90-luks.conf || exit 1
 add_dracutmodules+=" systemd crypt btrfs tpm2-tss "
 kernel_cmdline="${kernel_params}"
 EOF
+fi
 cat <<EOF > ${target}/etc/kernel/cmdline || exit 1
 ${kernel_params}
 EOF
@@ -466,7 +493,7 @@ fi
 
 chroot ${target}/ sh /tmp/run1.sh || exit 1
 
-if [ "${ENABLE_TPM}" == "true" ]; then
+if [ "${DISABLE_LUKS}" != "true" ] && [ "${ENABLE_TPM}" == "true" ]; then
   notify checking for tpm
   cp ${KEYFILE} ${target}/ || exit 1
   chmod 600 ${target}/${KEYFILE} || exit 1
@@ -487,7 +514,7 @@ EOF
   chroot ${target}/ bash /tmp/run4.sh || exit 1
   rm ${target}/${KEYFILE} || exit 1
 else
-  notify tpm disabled
+  notify tpm disabled or LUKS disabled
 fi
 
 notify install kernel and firmware on ${target}

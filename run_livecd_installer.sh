@@ -70,6 +70,9 @@ if (wget -q --show-progress -O "${TMP_DIR}/installer.tar.gz" "${BUNDLE_URL}" || 
   $SUDO mkdir -p "${BUNDLE_DIR}"
   $SUDO tar -xzf "${TMP_DIR}/installer.tar.gz" -C "${BUNDLE_DIR}" --strip-components=1
   $SUDO chmod +x "${BUNDLE_DIR}/run_from_bundle.sh" || true
+  echo "> Installing required host packages..."
+  $SUDO apt-get update -y || true
+  $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y cryptsetup debootstrap uuid-runtime btrfs-progs dosfstools || true
   echo "> Launching from bundle"
   exec $SUDO "${BUNDLE_DIR}/run_from_bundle.sh"
 else
