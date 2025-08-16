@@ -14,7 +14,7 @@ func main() {
 
 	backendCmd := flag.NewFlagSet("backend", flag.ExitOnError)
 	backendPort := backendCmd.Int("listenPort", 5000, "listen tcp port for the web server")
-	backendStatic := backendCmd.String("staticHtmlFolder", "/var/www/html/opinionated-debian-installer/", "folder with static html content")
+	backendStatic := backendCmd.String("staticHtmlFolder", os.Getenv("STATIC_HTML_FOLDER"), "folder with static html content")
 
 	if len(os.Args) < 2 {
 		fmt.Println("expected 'tui' or 'backend' subcommands")

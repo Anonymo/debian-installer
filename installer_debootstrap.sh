@@ -63,19 +63,23 @@ function check_dependencies() {
 
 function partition_disk() {
     notify "Creating partitions on ${DISK}..."
+    EFI_PART_UUID=$(uuidgen)
+    ROOT_PART_UUID=$(uuidgen)
     sfdisk "$DISK" <<EOF || error_exit "Failed to create partitions."
 label: gpt
 unit: sectors
 sector-size: 512
 
-start=2048, size=2097152, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, name="EFI system partition", uuid=$(uuidgen)
-start=2099200, size=, type=4f68bce3-e8cd-4db1-96e7-fbcaf984b709, name="Root partition", uuid=$(uuidgen)
+start=2048, size=2097152, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, name="EFI system partition", uuid=${EFI_PART_UUID}
+start=2099200, size=, type=4f68bce3-e8cd-4db1-96e7-fbcaf984b709, name="Root partition", uuid=${ROOT_PART_UUID}
 EOF
+    echo "${EFI_PART_UUID}" > /tmp/efi-part.uuid
+    echo "${ROOT_PART_UUID}" > /tmp/root-part.uuid
 }
 
 function setup_luks_and_btrfs() {
-    efi_partition="$(lsblk -o PARTUUID,PATH | grep -v "-" | sed -n "2p" | awk '{print "/dev/disk/by-partuuid/"$1}')"
-    root_partition="$(lsblk -o PARTUUID,PATH | grep -v "-" | sed -n "3p" | awk '{print "/dev/disk/by-partuuid/"$1}')"
+    efi_partition="/dev/disk/by-partuuid/$(cat /tmp/efi-part.uuid)"
+    root_partition="/dev/disk/by-partuuid/$(cat /tmp/root-part.uuid)"
 
     if [ "${DISABLE_LUKS}" != "true" ]; then
         log "Setting up LUKS on ${root_partition}..."
@@ -89,6 +93,7 @@ function setup_luks_and_btrfs() {
     log "Creating Btrfs filesystem on ${root_device}..."
     mkfs.btrfs -f "${root_device}"
     btrfs_uuid=$(btrfs filesystem show "${root_device}" | grep -oP 'uuid: \K\S+')
+    echo "${btrfs_uuid}" > /tmp/btrfs.uuid
 
     log "Creating Btrfs subvolumes..."
     mount "${root_device}" /mnt
@@ -99,7 +104,14 @@ function setup_luks_and_btrfs() {
 }
 
 function mount_and_debootstrap() {
+    root_device=/dev/mapper/cryptroot
+    if [ "${DISABLE_LUKS}" == "true" ]; then
+        root_device="/dev/disk/by-partuuid/$(cat /tmp/root-part.uuid)"
+    fi
+    efi_partition="/dev/disk/by-partuuid/$(cat /tmp/efi-part.uuid)"
+
     log "Mounting filesystems..."
+    mkdir -p /target
     mount -o "${FSFLAGS},subvol=@" "${root_device}" /target
     mkdir -p /target/home
     mount -o "${FSFLAGS},subvol=@home" "${root_device}" /target/home
@@ -114,6 +126,8 @@ function mount_and_debootstrap() {
 
 function configure_chroot() {
     log "Configuring the new system..."
+    btrfs_uuid=$(cat /tmp/btrfs.uuid)
+    efi_part_uuid=$(cat /tmp/efi-part.uuid)
 
     # Mount system directories
     mount -t proc none /target/proc
@@ -125,18 +139,45 @@ function configure_chroot() {
 UUID=${btrfs_uuid} / btrfs defaults,subvol=@,${FSFLAGS} 0 0
 UUID=${btrfs_uuid} /home btrfs defaults,subvol=@home,${FSFLAGS} 0 0
 UUID=${btrfs_uuid} /.snapshots btrfs defaults,subvol=@snapshots,${FSFLAGS} 0 0
-PARTUUID=$(lsblk -o PARTUUID,PATH | grep -v "-" | sed -n "2p" | awk '{print $1}') /boot/efi vfat defaults 0 0
+PARTUUID=${efi_part_uuid} /boot/efi vfat defaults 0 0
 EOF
 
     # Setup APT sources
-    # ... (This part can be reused from the original script)
+    cat <<EOF > /target/etc/apt/sources.list.d/debian.sources
+Types: deb
+URIs: http://deb.debian.org/debian/
+Suites: ${DEBIAN_VERSION}
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: http://deb.debian.org/debian/
+Suites: ${DEBIAN_VERSION}-updates
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: http://security.debian.org/debian-security/
+Suites: ${DEBIAN_VERSION}-security
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+EOF
 
     # Chroot and install packages
     chroot /target /bin/bash <<EOF
 set -e
 apt-get update
-apt-get install -y linux-image-amd64 systemd-boot btrfs-progs
+apt-get install -y linux-image-amd64 systemd-boot btrfs-progs tasksel
 bootctl install
+
+# Install desktop environment
+if [ -n "${XDG_CURRENT_DESKTOP}" ]; then
+    if [[ "${XDG_CURRENT_DESKTOP}" == *"GNOME"* ]]; then
+        tasksel install gnome-desktop
+    elif [[ "${XDG_CURRENT_DESKTOP}" == *"KDE"* ]]; then
+        tasksel install kde-desktop
+    fi
+fi
 
 # Create user
 adduser --disabled-password --gecos "${USER_FULL_NAME}" "${USERNAME}"

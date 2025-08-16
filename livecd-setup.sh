@@ -3,7 +3,8 @@
 set -e
 
 # --- Configuration ---
-INSTALLER_REPO="https://github.com/r0b0/debian-installer"
+# IMPORTANT: You need to change this to your forked repository URL
+INSTALLER_REPO="https://github.com/YOUR_USERNAME/debian-installer-btrfs"
 INSTALLER_VERSION="latest"
 
 # --- Helper Functions ---
@@ -34,15 +35,21 @@ function main() {
 
     check_dependencies
 
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    trap 'rm -rf -- "$temp_dir"' EXIT
+
     log "Downloading the installer..."
-    wget -O /tmp/installer.tar.gz "${INSTALLER_REPO}/releases/download/${INSTALLER_VERSION}/opinionated-debian-installer.tar.gz"
+    wget -O "${temp_dir}/installer.tar.gz" "${INSTALLER_REPO}/releases/download/${INSTALLER_VERSION}/opinionated-debian-installer.tar.gz"
 
     log "Extracting the installer..."
-    mkdir -p /opt/installer
-    tar -xzf /tmp/installer.tar.gz -C /opt/installer
+    mkdir -p "${temp_dir}/installer"
+    tar -xzf "${temp_dir}/installer.tar.gz" -C "${temp_dir}/installer"
 
     log "Starting the installer backend..."
-    /opt/installer/opinionated-installer backend
+    export STATIC_HTML_FOLDER="${temp_dir}/installer/frontend"
+    export INSTALLER_SCRIPT="${temp_dir}/installer/installer_debootstrap.sh"
+    "${temp_dir}/installer/opinionated-installer" backend
 
     log "The installer is now running. Open your web browser to http://localhost:5000 to continue."
 }

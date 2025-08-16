@@ -38,6 +38,8 @@ export default {
         MAKE_UBUNTU_LIKE: false,
         ENABLE_SUDO: true,
         DISABLE_ROOT_ACCOUNT: false,
+        ENABLE_SNAPPER: true,
+        INSTALL_SDBOOTUTIL: true,
       }
     }
   },
@@ -351,7 +353,15 @@ export default {
 
         <br>
         <input type="checkbox" v-model="installer.MAKE_UBUNTU_LIKE" id="MAKE_UBUNTU_LIKE" class="inline mt-3" :disabled="running">
-        <label for="MAKE_UBUNTU_LIKE" class="inline mt-3">Make Debian look like Ubuntu</label>
+        <label for="MAKE_UBUNTU_LIKE" class="inline mt-3">Make Debian look like Ubuntu (Yaru theme, no Flatpak)</label>
+
+        <br>
+        <input type="checkbox" v-model="installer.ENABLE_SNAPPER" id="ENABLE_SNAPPER" class="inline mt-3" :disabled="running">
+        <label for="ENABLE_SNAPPER" class="inline mt-3">Enable Snapper for automatic system snapshots (openSUSE-style)</label>
+
+        <br>
+        <input type="checkbox" v-model="installer.INSTALL_SDBOOTUTIL" id="INSTALL_SDBOOTUTIL" class="inline mt-3" :disabled="running">
+        <label for="INSTALL_SDBOOTUTIL" class="inline mt-3">Install sdbootutil for enhanced systemd-boot management</label>
 
       </fieldset>
 

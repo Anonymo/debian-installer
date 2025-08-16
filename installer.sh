@@ -242,6 +242,16 @@ if [ ! -e ${top_level_mount}/@ ]; then
     notify create @ and @home subvolumes on ${top_level_mount}
     btrfs subvolume create ${top_level_mount}/@ || exit 1
     btrfs subvolume create ${top_level_mount}/@home || exit 1
+    
+    # Create openSUSE-style subvolumes for Snapper
+    notify create @snapshots subvolume for Snapper on ${top_level_mount}
+    btrfs subvolume create ${top_level_mount}/@snapshots || exit 1
+    chmod 750 ${top_level_mount}/@snapshots || exit 1
+    
+    notify create @var and @log subvolumes on ${top_level_mount}
+    btrfs subvolume create ${top_level_mount}/@var || exit 1
+    btrfs subvolume create ${top_level_mount}/@log || exit 1
+    
     if [ "${ENABLE_SWAP}" == "file" ]; then
         notify create @swap subvolume for swap file on ${top_level_mount}
         btrfs subvolume create ${top_level_mount}/@swap || exit 1
@@ -257,6 +267,15 @@ else
     mount ${root_device} ${target} -o ${FSFLAGS},subvol=@ || exit 1
     mkdir -p ${target}/home || exit 1
     mount ${root_device} ${target}/home -o ${FSFLAGS},subvol=@home || exit 1
+    
+    # Mount Snapper and additional subvolumes
+    mkdir -p ${target}/.snapshots || exit 1
+    mount ${root_device} ${target}/.snapshots -o ${FSFLAGS},subvol=@snapshots || exit 1
+    mkdir -p ${target}/var || exit 1
+    mount ${root_device} ${target}/var -o ${FSFLAGS},subvol=@var || exit 1
+    mkdir -p ${target}/var/log || exit 1
+    mount ${root_device} ${target}/var/log -o ${FSFLAGS},subvol=@log || exit 1
+    
     if [ "${ENABLE_SWAP}" == "file" ]; then
         notify mount swap subvolume on ${target}
         mkdir -p ${target}/swap || exit 1
@@ -311,6 +330,9 @@ mkdir -p ${target}/root/btrfs1 || exit 1
 cat <<EOF > ${target}/etc/fstab || exit 1
 UUID=${btrfs_uuid} / btrfs defaults,subvol=@,${FSFLAGS} 0 1
 UUID=${btrfs_uuid} /home btrfs defaults,subvol=@home,${FSFLAGS} 0 1
+UUID=${btrfs_uuid} /.snapshots btrfs defaults,subvol=@snapshots,${FSFLAGS} 0 1
+UUID=${btrfs_uuid} /var btrfs defaults,subvol=@var,${FSFLAGS} 0 1
+UUID=${btrfs_uuid} /var/log btrfs defaults,subvol=@log,${FSFLAGS} 0 1
 UUID=${btrfs_uuid} /root/btrfs1 btrfs defaults,subvolid=5,${FSFLAGS} 0 1
 PARTUUID=${efi_part_uuid} /boot/efi vfat defaults,umask=077 0 2
 EOF
@@ -419,8 +441,25 @@ cat <<EOF > ${target}/tmp/run1.sh || exit 1
 export DEBIAN_FRONTEND=noninteractive
 apt-get install -y locales  tasksel network-manager sudo || exit 1
 apt-get install -y -t ${BACKPORTS_VERSION} systemd systemd-boot dracut btrfs-progs cryptsetup tpm2-tools tpm-udev || exit 1
+if [ "${ENABLE_SNAPPER}" == "true" ]; then
+    apt-get install -y snapper libpam-snapper || exit 1
+fi
 bootctl install || exit 1
+
+# Install sdbootutil from openSUSE (with attribution)
+if [ "${INSTALL_SDBOOTUTIL}" == "true" ]; then
+    if [ -f /install-sdbootutil.sh ]; then
+        bash /install-sdbootutil.sh / || echo "Warning: sdbootutil installation failed, continuing with standard systemd-boot"
+    fi
+fi
 EOF
+
+# Copy sdbootutil installer if available
+if [ "${INSTALL_SDBOOTUTIL}" == "true" ] && [ -f ./install-sdbootutil.sh ]; then
+    cp ./install-sdbootutil.sh ${target}/install-sdbootutil.sh
+    chmod +x ${target}/install-sdbootutil.sh
+fi
+
 chroot ${target}/ sh /tmp/run1.sh || exit 1
 
 if [ "${ENABLE_TPM}" == "true" ]; then
@@ -515,6 +554,34 @@ systemctl disable systemd-networkd-wait-online.service
 EOF
 chroot ${target}/ bash /tmp/run2.sh || exit 1
 
+if [ "${ENABLE_SNAPPER}" == "true" ]; then
+    notify configure Snapper for automatic snapshots
+    cat <<'EOF' > ${target}/tmp/configure_snapper.sh
+#!/bin/bash
+set -e
+# Configure Snapper for root filesystem
+snapper -c root create-config /
+# Enable automatic snapshots
+systemctl enable snapper-timeline.timer
+systemctl enable snapper-cleanup.timer
+# Configure Snapper settings (openSUSE-like)
+snapper -c root set-config "TIMELINE_CREATE=yes"
+snapper -c root set-config "TIMELINE_CLEANUP=yes"
+snapper -c root set-config "TIMELINE_LIMIT_HOURLY=10"
+snapper -c root set-config "TIMELINE_LIMIT_DAILY=10"
+snapper -c root set-config "TIMELINE_LIMIT_WEEKLY=0"
+snapper -c root set-config "TIMELINE_LIMIT_MONTHLY=10"
+snapper -c root set-config "TIMELINE_LIMIT_YEARLY=10"
+# Configure number cleanup
+snapper -c root set-config "NUMBER_CLEANUP=yes"
+snapper -c root set-config "NUMBER_LIMIT=50"
+snapper -c root set-config "NUMBER_LIMIT_IMPORTANT=10"
+# Enable boot snapshots
+systemctl enable snapper-boot.timer
+EOF
+    chroot ${target}/ bash /tmp/configure_snapper.sh || exit 1
+fi
+
 if [ "$ENABLE_POPCON" = true ] ; then
   notify enabling popularity-contest
   cat <<EOF > ${target}/tmp/run3.sh || exit 1
@@ -523,6 +590,41 @@ echo "popularity-contest      popularity-contest/participate  boolean true" | de
 apt-get install -y popularity-contest
 EOF
   chroot ${target}/ bash /tmp/run3.sh || exit 1
+fi
+
+if [ "${MAKE_UBUNTU_LIKE}" == "true" ]; then
+    notify "Applying Ubuntu-like theme (without Flatpak)..."
+    cat <<'EOF' > ${target}/tmp/apply_theme.sh
+#!/bin/bash
+set -e
+export DEBIAN_FRONTEND=noninteractive
+
+# Install Ubuntu theme packages
+apt-get install -y yaru-theme-gtk yaru-theme-icon yaru-theme-sound ubuntu-mono fonts-ubuntu gnome-tweaks
+
+# Configure GNOME settings for Ubuntu-like appearance
+if command -v gsettings &> /dev/null; then
+    # Set theme
+    gsettings set org.gnome.desktop.interface gtk-theme 'Yaru'
+    gsettings set org.gnome.desktop.interface icon-theme 'Yaru'
+    gsettings set org.gnome.desktop.interface cursor-theme 'Yaru'
+    
+    # Set fonts
+    gsettings set org.gnome.desktop.interface font-name 'Ubuntu 11'
+    gsettings set org.gnome.desktop.interface document-font-name 'Ubuntu 11'
+    gsettings set org.gnome.desktop.interface monospace-font-name 'Ubuntu Mono 13'
+    
+    # Set window buttons to Ubuntu style
+    gsettings set org.gnome.desktop.wm.preferences button-layout 'close,minimize,maximize:'
+    
+    # Enable dark theme preference
+    gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+fi
+
+# Note: This is a simplified Ubuntu theme that avoids Flatpak
+# Based on DeltaLima's make-debian-look-like-ubuntu but without Flatpak components
+EOF
+    chroot ${target}/ bash /tmp/apply_theme.sh || exit 1
 fi
 
 if [ ! -z "${SSH_PUBLIC_KEY}" ]; then
