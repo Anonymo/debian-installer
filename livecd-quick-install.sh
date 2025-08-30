@@ -101,10 +101,10 @@ echo ""
 # Run pre-flight checks
 pre_flight_checks
 
-# Enable contrib and non-free repositories
+# Enable contrib and non-free repositories (skip first line with /run/live/medium)
 echo "→ Enabling contrib and non-free repositories..."
-sudo sed -i '/^deb http/ s/ main/ main contrib non-free/' /etc/apt/sources.list
-sudo sed -i '/^deb-src http/ s/ main/ main contrib non-free/' /etc/apt/sources.list
+sudo sed -i '/^deb http/ s/ main$/ main contrib non-free non-free-firmware/' /etc/apt/sources.list
+sudo sed -i '/^deb-src http/ s/ main$/ main contrib non-free non-free-firmware/' /etc/apt/sources.list
 
 # Update package lists
 echo "→ Updating package lists..."
